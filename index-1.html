@@ -430,7 +430,8 @@
       font-size: 11px; font-weight: 600; color: #2d2d2d;
       margin-bottom: 2px;
     }
-    .pipe-group-icon { font-size: 12px; flex-shrink: 0; }
+    .pipe-group-icon { flex-shrink: 0; display: inline-flex; align-items: center; }
+    .pipe-group-icon svg { width: 14px; height: 14px; }
     .pipe-group-name { flex: 1; }
     .pipe-group-total { color: #9ca3af; font-weight: 500; font-size: 10px; white-space: nowrap; }
     .pipe-item {
@@ -610,6 +611,7 @@
       gap: 12px;
       pointer-events: auto;
       z-index: 50;
+      background: #f0f0f0;
     }
     #drop-overlay.hidden { display: none; }
     #drop-icon { font-size: 52px; opacity: 0.2; }
@@ -2125,9 +2127,10 @@ document.getElementById('font-size-input').addEventListener('input', e => {
 // LABEL BACKGROUND TOGGLE
 // =========================================================
 const btnLabelBg = document.getElementById('btn-label-bg');
+const _bgIcon = btnLabelBg.querySelector('.btn-icon').outerHTML;
 btnLabelBg.onclick = () => {
   state.labelBg = !state.labelBg;
-  btnLabelBg.textContent = state.labelBg ? 'Hintergrund: Hell' : 'Hintergrund: Dunkel';
+  btnLabelBg.innerHTML = _bgIcon + (state.labelBg ? ' BG: Hell' : ' BG: Dunkel');
   btnLabelBg.classList.toggle('active', state.labelBg);
 };
 
@@ -6243,7 +6246,7 @@ document.getElementById('json-input').onchange = e => {
       state.activePipeRefs = Array.isArray(data.activePipeRefs) ? data.activePipeRefs : [];
       pipeRefId = state.pipeReferences.reduce((max, r) => Math.max(max, r.id), 0);
       document.getElementById('font-size-input').value = state.fontSize;
-      btnLabelBg.textContent = state.labelBg ? 'Hintergrund: Hell' : 'Hintergrund: Dunkel';
+      btnLabelBg.innerHTML = _bgIcon + (state.labelBg ? ' BG: Hell' : ' BG: Dunkel');
       btnLabelBg.classList.toggle('active', state.labelBg);
       canvas.loadFromJSON(data.canvas, () => {
         canvas.renderAll();
