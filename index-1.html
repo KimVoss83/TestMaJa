@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#ffffff" />
-  <title>Gartenplaner</title>
+  <title>Planer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
@@ -1018,7 +1018,7 @@
 <body>
 
 <div id="header">
-  <h1>Gartenplaner</h1>
+  <h1>Planer</h1>
   <span id="header-sub">Luftbild · Maßstab · Messung</span>
 </div>
 
@@ -6008,7 +6008,7 @@ document.getElementById('btn-save-pdf').onclick = () => {
   // ── Titelblock rechts ──
   const dateStr = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
   pdf.setFontSize(7); pdf.setTextColor(80);
-  pdf.text(`Gartenplaner`, pageW - margin, footerY + 3, { align: 'right' });
+  pdf.text(`Planer`, pageW - margin, footerY + 3, { align: 'right' });
   pdf.setFontSize(6); pdf.setTextColor(130);
   pdf.text(`Exportiert: ${dateStr}`, pageW - margin, footerY + 7, { align: 'right' });
   if (state.scale && state.imgDisplayScale) {
