@@ -6828,7 +6828,7 @@ let releaseData = null;
   if (!releaseData?.version) return;
   const lastSeen = localStorage.getItem('gp_last_seen_version');
   if (releaseData.version !== lastSeen) {
-    document.getElementById('whats-new-badge').classList.add('visible');
+    document.getElementById('whats-new-badge')?.classList.add('visible');
   }
 })();
 
