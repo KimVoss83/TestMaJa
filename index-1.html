@@ -881,6 +881,37 @@
     .help-val { color: #3c3c43; }
     #help-popover hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); margin: 7px 0; }
 
+    /* ── Whats-New Popover ── */
+    #whats-new-popover {
+      position: fixed;
+      top: 52px; right: 10px;
+      width: 260px;
+      background: rgba(255,255,255,0.98);
+      border-radius: 12px;
+      padding: 14px 15px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+      z-index: 600;
+      font-size: 11.5px;
+      line-height: 1.6;
+      display: none;
+    }
+    #whats-new-popover.open { display: block; }
+    #whats-new-popover h3 { font-size: 12px; font-weight: 700; color: #1d1d1f; margin: 0 0 8px 0; }
+    #whats-new-popover .rn-category { font-size: 10px; font-weight: 700; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 3px 0; }
+    #whats-new-popover .rn-entry { color: #3c3c43; padding: 1px 0; }
+
+    /* ── Neu-Button Badge ── */
+    .btn-with-badge { position: relative; }
+    .btn-badge {
+      position: absolute; top: 2px; right: 2px;
+      width: 6px; height: 6px;
+      background: #ff3b30;
+      border-radius: 50%;
+      display: none;
+    }
+    .btn-badge.visible { display: block; }
+
     /* ── Mobile Drawer Toggle ── */
     #mobile-drawer-toggle {
       display: none;
