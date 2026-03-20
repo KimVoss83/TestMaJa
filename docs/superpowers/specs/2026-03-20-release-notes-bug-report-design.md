@@ -20,7 +20,8 @@ Zwei neue Features in der bestehenden Single-HTML-App:
 
 Pfad: `.github/workflows/release-notes.yml`
 
-- Trigger: `push` auf `main`, außer Commits die `[skip ci]` im Message enthalten (via `if: "!contains(github.event.head_commit.message, '[skip ci]')"`)
+- Trigger: `push` auf `main`, außer wenn HEAD-Commit `[skip ci]` enthält (via `if: "!contains(github.event.head_commit.message, '[skip ci]')"`)
+  - Hinweis: der Filter greift nur auf den HEAD-Commit. Bei einem Multi-Commit-Push mit `[skip ci]` in einem mittleren Commit wird die Action dennoch ausgeführt — das ist akzeptables Verhalten.
 - `fetch-depth: 0` (vollständige History nötig für korrekte Commit-Range)
 - Commit-Range: `${{ github.event.before }}..HEAD`, übergeben als Env-Variable `BEFORE_SHA` an das Python-Skript
 - Permissions: `contents: write` explizit gesetzt
@@ -49,7 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git diff --quiet || (git commit -am "chore: update release notes [skip ci]" && git push)
+          git diff --quiet || (git commit -am "chore: update release notes [skip ci]" && git pull --rebase && git push)
 ```
 
 ### Python-Skript
@@ -86,6 +87,7 @@ else:
 **JSON-Injektion:**
 - Sucht den Platzhalter-Kommentar via Regex: `<!-- RELEASE_NOTES_DATA:.*? -->`
 - Ersetzt ihn durch: `<!-- RELEASE_NOTES_DATA:<json> -->`
+- JSON wird ohne Zeilenumbrüche serialisiert (`json.dumps(..., separators=(',', ':'))`), damit die Einzeilen-Regex zuverlässig matcht
 - Wenn kein Platzhalter vorhanden: Skript gibt Fehler aus und bricht ab (Platzhalter muss initial gesetzt sein)
 - JSON-Struktur:
 ```json
@@ -126,8 +128,9 @@ while (walker.nextNode()) {
 ### Hinweispunkt
 
 - `localStorage`-Key: `gp_last_seen_version` (konsistent mit bestehenden Keys wie `gp_ob_seen`)
-- Beim Start: wenn `releaseData.version !== localStorage.getItem('gp_last_seen_version')` → Punkt einblenden
+- Beim Start: wenn `releaseData?.version` vorhanden und `!== localStorage.getItem('gp_last_seen_version')` → Punkt einblenden
 - Nach Öffnen des Panels: `localStorage.setItem('gp_last_seen_version', releaseData.version)`
+- Wenn `releaseData` null ist (Platzhalter noch nicht befüllt): kein Punkt, kein Panel
 
 ---
 
@@ -145,6 +148,8 @@ Beide Buttons ganz rechts im `#header`, im Stil der bestehenden Buttons:
 - Roter 6px-Kreis (`position: absolute`, `top: 2px`, `right: 2px`) nur sichtbar wenn neue Version
 - Klick öffnet ein Popover analog zu `#help-popover` (`position: absolute; top: 52px; right: 10px`)
 - Öffnen des "Neu"-Popovers schließt `#help-popover` (und umgekehrt) um Überlappung zu vermeiden
+- Button-Click-Handler ruft `e.stopPropagation()` damit der globale `document`-Click-Listener das Popover nicht sofort wieder schließt
+- Schließen bei Klick außerhalb: gleiche Logik wie `#help-popover` (`e.target.closest('#whats-new-popover')`)
 - Inhalt: Datum + gruppierte Einträge nach Kategorie (Neu / Behoben / Geändert), neueste Einträge oben
 
 ### Bug-Button
@@ -165,7 +170,7 @@ Beide Buttons ganz rechts im `#header`, im Stil der bestehenden Buttons:
   --- Systeminfo ---
   Browser: <navigator.userAgent>
   Bildschirm: <screen.width>x<screen.height>
-  App-Version: <releaseData.version>
+  App-Version: <releaseData?.version ?? 'unbekannt'>
   ```
 
 ---
