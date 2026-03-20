@@ -6807,6 +6807,32 @@ document.addEventListener('click', e => {
 });
 
 // =========================================================
+// RELEASE NOTES & BUG REPORT
+// =========================================================
+
+// Schritt 1: Daten aus HTML-Kommentar lesen (TreeWalker, Safari-sicher)
+let releaseData = null;
+(function () {
+  const walker = document.createTreeWalker(document, NodeFilter.SHOW_COMMENT);
+  while (walker.nextNode()) {
+    const val = walker.currentNode.nodeValue.trim();
+    if (val.startsWith('RELEASE_NOTES_DATA:')) {
+      try { releaseData = JSON.parse(val.slice('RELEASE_NOTES_DATA:'.length)); } catch {}
+      break;
+    }
+  }
+})();
+
+// Schritt 2: Badge zeigen wenn neue Version
+(function () {
+  if (!releaseData?.version) return;
+  const lastSeen = localStorage.getItem('gp_last_seen_version');
+  if (releaseData.version !== lastSeen) {
+    document.getElementById('whats-new-badge').classList.add('visible');
+  }
+})();
+
+// =========================================================
 // MOBILE: DRAWER TOGGLE
 // =========================================================
 const _sidebar = document.getElementById('sidebar');
