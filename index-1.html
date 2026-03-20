@@ -6886,6 +6886,30 @@ document.getElementById('btn-help').addEventListener('click', () => {
   document.getElementById('whats-new-popover').classList.remove('open');
 });
 
+// Bug-Report per mailto
+document.getElementById('btn-bug').addEventListener('click', () => {
+  const bodyHTML = `
+    <p style="font-size:12px;color:#6b7280;margin:0 0 8px 0;">
+      Bitte beschreibe das Problem so genau wie möglich.
+    </p>
+    <textarea id="bug-text" rows="5"
+      style="width:100%;box-sizing:border-box;border:1px solid #e5e7eb;border-radius:8px;
+             padding:8px;font-family:inherit;font-size:13px;resize:vertical;"
+      placeholder="Problem beschreiben..."></textarea>`;
+
+  createModal('Fehler melden', bodyHTML, () => {
+    // onCancel: undefined (Modal schließt nur), okLabel: 'Senden'
+    const text = document.getElementById('bug-text')?.value?.trim() || '';
+    const version = releaseData?.version ?? 'unbekannt';
+    const today = new Date().toISOString().slice(0, 10);
+    const subject = encodeURIComponent(`[Bug] Planer – ${today}`);
+    const body = encodeURIComponent(
+      `Problem:\n${text || '(kein Text eingegeben)'}\n\n--- Systeminfo ---\nBrowser: ${navigator.userAgent}\nBildschirm: ${screen.width}x${screen.height}\nApp-Version: ${version}`
+    );
+    window.location.href = `mailto:rumpelt-grauen.07@icloud.com?subject=${subject}&body=${body}`;
+  }, undefined, 'Senden');
+});
+
 // =========================================================
 // MOBILE: DRAWER TOGGLE
 // =========================================================
