@@ -1078,7 +1078,12 @@
       <button id="btn-save-pdf">PDF</button>
       <button id="btn-save-png">PNG</button>
     </div>
-    <div class="tool-group" style="border-right:none;padding-right:4px;">
+    <div class="tool-group" style="border-right:none;padding-right:4px;gap:4px;">
+      <button id="btn-bug" title="Fehler melden" style="font-size:12px;padding:4px 9px;">Bug</button>
+      <span class="btn-with-badge">
+        <button id="btn-whats-new" title="Was ist neu?" style="font-size:12px;padding:4px 9px;">Neu</button>
+        <span class="btn-badge" id="whats-new-badge"></span>
+      </span>
       <button id="btn-help" title="Tastenkürzel & Hilfe" style="font-size:14px;padding:4px 9px;">?</button>
     </div>
   </div>
@@ -1332,6 +1337,12 @@
     <button id="acc-panel-close">✕</button>
   </div>
   <div id="acc-panel-body"></div>
+</div>
+
+<!-- Whats-New Popover -->
+<div id="whats-new-popover">
+  <h3>Was ist neu?</h3>
+  <div id="whats-new-content"></div>
 </div>
 
 <!-- Help Popover -->
