@@ -5913,7 +5913,7 @@ function openMaterialCalc(id) {
 // =========================================================
 // MODAL
 // =========================================================
-function createModal(title, bodyHTML, onConfirm, onCancel) {
+function createModal(title, bodyHTML, onConfirm, onCancel, okLabel = 'OK') {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -5922,7 +5922,7 @@ function createModal(title, bodyHTML, onConfirm, onCancel) {
       ${bodyHTML}
       <div class="btn-row">
         <button id="modal-cancel">Abbrechen</button>
-        <button id="modal-ok" style="background:#4ecca3;color:#1a1a2e;border-color:#4ecca3;font-weight:600">OK</button>
+        <button id="modal-ok" style="background:#4ecca3;color:#1a1a2e;border-color:#4ecca3;font-weight:600">${okLabel}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
