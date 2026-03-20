@@ -6833,6 +6833,9 @@ let releaseData = null;
 })();
 
 // Schritt 3: "Neu"-Popover befüllen und öffnen
+function _escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 function renderWhatsNew() {
   if (!releaseData?.entries?.length) {
     document.getElementById('whats-new-content').innerHTML =
@@ -6840,12 +6843,12 @@ function renderWhatsNew() {
     return;
   }
   const cats = ['Neu', 'Behoben', 'Geändert'];
-  let html = `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">${releaseData.version}</div>`;
+  let html = `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">${_escHtml(releaseData.version)}</div>`;
   for (const cat of cats) {
     const items = releaseData.entries.filter(e => e.cat === cat);
     if (!items.length) continue;
-    html += `<div class="rn-category">${cat}</div>`;
-    items.forEach(e => { html += `<div class="rn-entry">· ${e.msg}</div>`; });
+    html += `<div class="rn-category">${_escHtml(cat)}</div>`;
+    items.forEach(e => { html += `<div class="rn-entry">· ${_escHtml(e.msg)}</div>`; });
   }
   document.getElementById('whats-new-content').innerHTML = html;
 }
