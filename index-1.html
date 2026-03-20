@@ -1583,6 +1583,26 @@ function _dataUrlToSvgText(dataUrl) {
   return meta.includes('base64') ? atob(data) : decodeURIComponent(data);
 }
 
+// ── SVG-Sanitizer (XSS-Schutz) ──────────────────────────
+function sanitizeSVG(svgString) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgString, 'image/svg+xml');
+  // Entferne gefährliche Tags
+  const dangerous = ['script', 'iframe', 'object', 'embed', 'link', 'meta', 'style[type="text/javascript"]'];
+  dangerous.forEach(sel => {
+    doc.querySelectorAll(sel).forEach(el => el.remove());
+  });
+  // Entferne Event-Handler-Attribute (on*) und javascript:-URIs
+  doc.querySelectorAll('*').forEach(el => {
+    [...el.attributes].forEach(attr => {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+      if (attr.name === 'href' && /^javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+      if (attr.name === 'xlink:href' && /^javascript:/i.test(attr.value)) el.removeAttribute(attr.name);
+    });
+  });
+  return new XMLSerializer().serializeToString(doc.documentElement);
+}
+
 async function initCustomLib() {
   await _openCustomDB();
   customLibItems = await _dbGetAll('items');
@@ -1683,7 +1703,7 @@ function placeCustomLibItem(item) {
     canvas.setActiveObject(obj); canvas.renderAll(); setTool('select');
   };
   if (item.type === 'svg') {
-    fabric.loadSVGFromString(_dataUrlToSvgText(item.dataUrl), (objects, options) => {
+    fabric.loadSVGFromString(sanitizeSVG(_dataUrlToSvgText(item.dataUrl)), (objects, options) => {
       if (!objects.length) return;
       const g = fabric.util.groupSVGElements(objects, options);
       g.forEachObject(o => { o.objectCaching = false; });
@@ -2105,8 +2125,10 @@ function calcAccuracy() {
     scaleErr_pct = 2.0; // konservativer Fallback
   }
 
-  const scaleErr100_m = 100 * scaleErr_pct / 100;
-  const err100m_m = Math.sqrt(digitErr_m ** 2 + scaleErr100_m ** 2);
+  // Maßstabsfehler bei 100 m Messdistanz [m]: dist_m × (scaleErr_pct / 100)
+  // Bei dist_m = 100: vereinfacht sich zu scaleErr_pct (numerisch gleich, aber korrekt dokumentiert)
+  const scaleErr100_m = 100 * (scaleErr_pct / 100); // [m] – skaliert auf 100 m Distanz
+  const err100m_m = Math.sqrt(digitErr_m ** 2 + scaleErr100_m ** 2); // Fehlerfortpflanzung [m]
 
   return {
     gsd_cm: gsd_m * 100,
