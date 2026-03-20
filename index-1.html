@@ -6904,7 +6904,7 @@ document.getElementById('btn-bug').addEventListener('click', () => {
     const today = new Date().toISOString().slice(0, 10);
     const subject = encodeURIComponent(`[Bug] Planer – ${today}`);
     const body = encodeURIComponent(
-      `Problem:\n${text || '(kein Text eingegeben)'}\n\n--- Systeminfo ---\nBrowser: ${navigator.userAgent}\nBildschirm: ${screen.width}x${screen.height}\nApp-Version: ${version}`
+      `Problem:\n${text || '(kein Text eingegeben)'}\n\n--- Systeminfo ---\nBrowser: ${navigator.userAgent}\nBildschirm: ${screen.width}x${screen.height}\nFenster: ${window.innerWidth}x${window.innerHeight}\nBild geladen: ${state.backgroundImage ? 'ja' : 'nein'}\nMaßstab gesetzt: ${state.scale ? 'ja (' + Math.round(state.scale * 100) / 100 + ' px/cm)' : 'nein'}\nCanvas: ${canvas.width}x${canvas.height}\nObjekte: ${canvas.getObjects().length}\nApp-Version: ${version}\nZeitstempel: ${new Date().toISOString()}`
     );
     window.location.href = `mailto:rumpelt-grauen.07@icloud.com?subject=${subject}&body=${body}`;
   }, undefined, 'Senden');
