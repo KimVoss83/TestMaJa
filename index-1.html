@@ -6832,6 +6832,57 @@ let releaseData = null;
   }
 })();
 
+// Schritt 3: "Neu"-Popover befüllen und öffnen
+function renderWhatsNew() {
+  if (!releaseData?.entries?.length) {
+    document.getElementById('whats-new-content').innerHTML =
+      '<div style="color:#9ca3af;font-size:11px;">Keine Einträge vorhanden.</div>';
+    return;
+  }
+  const cats = ['Neu', 'Behoben', 'Geändert'];
+  let html = `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">${releaseData.version}</div>`;
+  for (const cat of cats) {
+    const items = releaseData.entries.filter(e => e.cat === cat);
+    if (!items.length) continue;
+    html += `<div class="rn-category">${cat}</div>`;
+    items.forEach(e => { html += `<div class="rn-entry">· ${e.msg}</div>`; });
+  }
+  document.getElementById('whats-new-content').innerHTML = html;
+}
+
+document.getElementById('btn-whats-new').addEventListener('click', e => {
+  e.stopPropagation();
+  const pop = document.getElementById('whats-new-popover');
+  const isOpening = !pop.classList.contains('open');
+  // Andere Popovers schließen
+  document.getElementById('help-popover').classList.remove('open');
+  if (isOpening) {
+    renderWhatsNew();
+    pop.classList.add('open');
+    // Badge entfernen und Version als gesehen markieren
+    if (releaseData?.version) {
+      localStorage.setItem('gp_last_seen_version', releaseData.version);
+      document.getElementById('whats-new-badge')?.classList.remove('visible');
+    }
+  } else {
+    pop.classList.remove('open');
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#whats-new-popover') && e.target.id !== 'btn-whats-new') {
+    document.getElementById('whats-new-popover').classList.remove('open');
+  }
+});
+
+// Zweiter Listener auf btn-help: schließt whats-new-popover wenn help geöffnet wird.
+// Der ursprüngliche Handler (Zeile ~6798) bleibt unverändert und kümmert sich um help-popover.
+// Zwei unabhängige Listener auf demselben Button sind hier korrekt und gewollt —
+// jeder Handler hat eine einzige, klar abgegrenzte Aufgabe.
+document.getElementById('btn-help').addEventListener('click', () => {
+  document.getElementById('whats-new-popover').classList.remove('open');
+});
+
 // =========================================================
 // MOBILE: DRAWER TOGGLE
 // =========================================================
