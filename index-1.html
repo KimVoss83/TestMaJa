@@ -5487,7 +5487,7 @@ function removeMeasurement(id) {
   // If this pipe is being edited, end the edit first
   if (state.editingPipe && state.editingPipe.id === id) endPipeEdit();
   const wasPipe = state.measurements.some(m => m.id === id && m.type === 'pipe');
-  canvas.getObjects().filter(o => o._measureId === id).forEach(o => canvas.remove(o));
+  canvas.getObjects().filter(o => o._measureId === id || o._dimLinePipeId === id).forEach(o => canvas.remove(o));
   state.measurements = state.measurements.filter(m => m.id !== id);
   updateMeasurementList();
   if (wasPipe) {
@@ -6543,8 +6543,15 @@ function _doImportLeitungen(data, clickedPts) {
     }
   }
 
+  // Duplikat-Schutz: Rohre mit bereits vorhandener ID überspringen
+  const existingIds = new Set(state.measurements.map(m => m.id));
+  const pipesToImport = data.pipes.filter(p => !existingIds.has(p.id));
+  const skipped = data.pipes.length - pipesToImport.length;
+  if (skipped > 0) showToast(`${skipped} bereits vorhandene Leitung${skipped === 1 ? '' : 'en'} übersprungen.`, 'info');
+  if (pipesToImport.length === 0) { showToast('Alle Leitungen bereits vorhanden – Import übersprungen.', 'warning'); return; }
+
   let importedCount = 0;
-  data.pipes.forEach(pipe => {
+  pipesToImport.forEach(pipe => {
     if (!pipe.points_m || pipe.points_m.length < 2) return;
     if (!PIPE_TYPES[pipe.pipeType]) return;
 
@@ -6631,7 +6638,7 @@ document.getElementById('leitungen-import-input').onchange = e => {
       const close = () => document.body.removeChild(ov);
       ov.querySelector('#_li-ok').onclick     = () => { close(); _startAnchorImport(data); };
       ov.querySelector('#_li-cancel').onclick = close;
-    } catch (err) { showToast(err.message || 'Fehler beim Laden der Leitungsdatei.', 'error'); }
+    } catch (err) { showToast(err.message || 'Fehler beim Laden der Leitungsdatei.', 'error'); e.target.value = ''; }
   };
   reader.readAsText(file);
   e.target.value = '';
