@@ -3016,6 +3016,14 @@ const _loupe = (() => {
   return { get active() { return _active; }, show, hide, update };
 })();
 
+// ── RAF-Throttle für mouse:move renderAll ─────────────────
+let _rafPending = false;
+function throttledRender() {
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => { _rafPending = false; canvas.renderAll(); });
+}
+
 // =========================================================
 // CANVAS EVENTS
 // =========================================================
@@ -3026,7 +3034,7 @@ canvas.on('mouse:move', opt => {
   // Ref line preview
   if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
     state.drawingLine.set({ x2: p.x, y2: p.y });
-    canvas.renderAll();
+    throttledRender();
   }
   // Distance preview mit Live-Messwert
   if (state.tool === 'distance' && state.distPoints.length === 1 && state.drawingLine) {
@@ -3036,7 +3044,7 @@ canvas.on('mouse:move', opt => {
     const meters = state.scale ? pxDist / state.scale : null;
     const liveText = meters ? formatDistance(meters) : `${Math.round(pxDist)} px`;
     updateLiveLabel(p1, p, liveText);
-    canvas.renderAll();
+    throttledRender();
   }
   // Area preview
   if (state.tool === 'area' && state.areaPoints.length > 0) {
@@ -3073,7 +3081,7 @@ canvas.on('mouse:move', opt => {
       selectable: false, evented: false, _pipeRefTemp: true, _noSelect: true,
     });
     canvas.add(tempLine);
-    canvas.renderAll();
+    throttledRender();
   }
 
   // Loupe: show when a drawing/measurement tool or anchor mode is active, hide during pan
@@ -4274,7 +4282,7 @@ function showPipeDistanceGuides(cursorPt) {
 function projectPointOnLine(p, ref) {
   const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
   const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return { point: { x: ref.x1, y: ref.y1 }, dist: Math.hypot(p.x - ref.x1, p.y - ref.y1), t: 0 };
+  if (lenSq < 1e-9) return { point: { x: ref.x1, y: ref.y1 }, dist: Math.hypot(p.x - ref.x1, p.y - ref.y1), t: 0 };
   // Project onto infinite line (not clamped to segment)
   const t = ((p.x - ref.x1) * dx + (p.y - ref.y1) * dy) / lenSq;
   const projX = ref.x1 + t * dx;
@@ -4287,7 +4295,7 @@ function projectPointOnLine(p, ref) {
 function closestPointOnSegment(p, a, b) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return { x: a.x, y: a.y };
+  if (lenSq < 1e-9) return { x: a.x, y: a.y };
   const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
   return { x: a.x + t * dx, y: a.y + t * dy };
 }
@@ -5377,7 +5385,7 @@ function ptDist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
 function pointToSegmentDist(p, a, b) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  if (lenSq < 1e-9) return Math.hypot(p.x - a.x, p.y - a.y);
   let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
@@ -5764,7 +5772,6 @@ function openMaterialCalc(id) {
   }
   if (m.value < 0.01) {
     showToast('Messung zu klein für eine Materialberechnung.', 'warning'); return;
-    return;
   }
 
   const isArea = m.type === 'area' || m.type === 'circle' || m.type === 'arc';
@@ -6767,7 +6774,12 @@ window.addEventListener('resize', () => {
 })();
 
 // Redraw grid after every Fabric.js render (covers zoom + pan)
-canvas.on('after:render', drawGrid);
+let _gridRafPending = false;
+canvas.on('after:render', () => {
+  if (_gridRafPending) return;
+  _gridRafPending = true;
+  requestAnimationFrame(() => { _gridRafPending = false; drawGrid(); });
+});
 
 updateRefStatus();
 updateMeasurementList();
