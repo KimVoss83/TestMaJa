@@ -3247,8 +3247,8 @@ canvas.on('mouse:down', opt => {
   // Label tool: clicking an existing label → select/drag, not create new
   if (state.tool === 'label' && opt.target && opt.target._userLabel) return;
 
-  // Reference creation works from all measurement tools + pipe + Maßstab
-  if (['ref','distance','area','circle','arc','pipe'].includes(state.tool) && handlePipeRefClick(p)) return;
+  // Reference creation works from all tools (auch Auswahl)
+  if (['select','ref','distance','area','circle','arc','pipe'].includes(state.tool) && handlePipeRefClick(p)) return;
 
   switch (state.tool) {
     case 'ref':      handleRefClick(p); break;
