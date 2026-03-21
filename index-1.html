@@ -3550,26 +3550,65 @@ function promptReference(pxLen) {
       const unit = parseFloat(document.getElementById('ref-unit').value);
       const realLen_m = val * unit;
       if (!isNaN(val) && val > 0 && realLen_m >= 0.05 && realLen_m <= 10000) {
-        // Gewichteter KQ-Ausgleich aller Referenzlinien:
-        // s = Σ(pxLenᵢ × Lᵢ) / Σ(Lᵢ²)
-        state.refLines.push({ pxLen, realLen_m });
-        const num = state.refLines.reduce((s, r) => s + r.pxLen * r.realLen_m, 0);
-        const den = state.refLines.reduce((s, r) => s + r.realLen_m ** 2, 0);
-        state.scale = num / den;      // px/m (KQ-Schätzwert)
-        state.refSumL2 = den;         // Σ Lᵢ² für Fehlerformel
-        state.scaleSource = 'ref';
-        state.refLine.set({ strokeWidth: 0.5, selectable: true, evented: true, _isRef: true, lockMovementX: true, lockMovementY: true });
-        const unitStr = { '1': 'm', '0.01': 'cm', '0.001': 'mm' }[String(unit)];
-        addRefEndmarks(state.refLine, '#cc0000', null);
-        addLabel(
-          (state.refLine.x1 + state.refLine.x2) / 2,
-          (state.refLine.y1 + state.refLine.y2) / 2 - 12,
-          `Ref: ${val}${unitStr}`, '#cc0000', null
-        );
-        state.refLine = null;
-        updateRefStatus();
-        canvas.renderAll();
-        saveSnapshot();
+        // Plausibilitätsprüfung: weicht der neue Maßstab stark vom bisherigen ab?
+        const newScale = pxLen / realLen_m;
+        const commitRef = () => {
+          // Gewichteter KQ-Ausgleich aller Referenzlinien:
+          // s = Σ(pxLenᵢ × Lᵢ) / Σ(Lᵢ²)
+          state.refLines.push({ pxLen, realLen_m });
+          const num = state.refLines.reduce((s, r) => s + r.pxLen * r.realLen_m, 0);
+          const den = state.refLines.reduce((s, r) => s + r.realLen_m ** 2, 0);
+          state.scale = num / den;      // px/m (KQ-Schätzwert)
+          state.refSumL2 = den;         // Σ Lᵢ² für Fehlerformel
+          state.scaleSource = 'ref';
+          state.refLine.set({ strokeWidth: 0.5, selectable: true, evented: true, _isRef: true, lockMovementX: true, lockMovementY: true });
+          const unitStr = { '1': 'm', '0.01': 'cm', '0.001': 'mm' }[String(unit)];
+          addRefEndmarks(state.refLine, '#cc0000', null);
+          addLabel(
+            (state.refLine.x1 + state.refLine.x2) / 2,
+            (state.refLine.y1 + state.refLine.y2) / 2 - 12,
+            `Ref: ${val}${unitStr}`, '#cc0000', null
+          );
+          state.refLine = null;
+          updateRefStatus();
+          canvas.renderAll();
+          saveSnapshot();
+        };
+
+        if (state.scale && state.refLines.length > 0) {
+          const deviation = Math.abs(newScale - state.scale) / state.scale;
+          const deviationPct = (deviation * 100).toFixed(1);
+          // Erwartete vs. gemessene Länge
+          const expectedLen_m = pxLen / state.scale;
+          const fmtLen = v => v >= 1 ? v.toFixed(2) + ' m' : (v * 100).toFixed(1) + ' cm';
+
+          if (deviation > 0.15) {
+            // > 15% Abweichung → Warnung mit Details
+            const severeColor = deviation > 0.30 ? '#ff3b30' : '#ff9500';
+            const severeLabel = deviation > 0.30 ? 'Starke Abweichung' : 'Abweichung';
+            createModal(
+              `${severeLabel} erkannt`,
+              `<div style="background:${severeColor}11;border:1px solid ${severeColor}44;border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+                <div style="font-size:13px;font-weight:600;color:${severeColor};margin-bottom:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${severeColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  ${deviationPct}% Abweichung vom bisherigen Maßstab
+                </div>
+                <div style="font-size:12px;color:#374151;line-height:1.5;">
+                  <div style="display:flex;justify-content:space-between;"><span>Deine Angabe:</span><b>${fmtLen(realLen_m)}</b></div>
+                  <div style="display:flex;justify-content:space-between;"><span>Erwartet (laut bisherigem Maßstab):</span><b>${fmtLen(expectedLen_m)}</b></div>
+                  <div style="display:flex;justify-content:space-between;"><span>Differenz:</span><b style="color:${severeColor}">${fmtLen(Math.abs(realLen_m - expectedLen_m))}</b></div>
+                </div>
+              </div>
+              <p style="font-size:12px;color:#6b7280;margin:0;">Mögliche Ursachen: falsche Längenangabe, ungenaues Einzeichnen, oder Verzerrung im Luftbild.</p>`,
+              commitRef,
+              () => { canvas.remove(state.refLine); state.refLine = null; },
+              'Trotzdem verwenden'
+            );
+            return;
+          }
+        }
+
+        commitRef();
       } else {
         canvas.remove(state.refLine);
         state.refLine = null;
