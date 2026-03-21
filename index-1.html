@@ -1188,6 +1188,44 @@
       #touch-toolbar button span { display: none; }
       #touch-toolbar button { min-width: 40px; padding: 4px; }
     }
+
+    /* ── Touch Crosshair Overlay ── */
+    #touch-crosshair {
+      display: none;
+      position: fixed;
+      width: 44px; height: 44px;
+      pointer-events: none;
+      z-index: 800;
+      transform: translate(-50%, -50%);
+    }
+    #touch-crosshair .ch-v,
+    #touch-crosshair .ch-h {
+      position: absolute; background: rgba(210,30,30,0.85);
+    }
+    #touch-crosshair .ch-v {
+      width: 1.5px; height: 44px; left: 50%; top: 0; transform: translateX(-50%);
+    }
+    #touch-crosshair .ch-h {
+      width: 44px; height: 1.5px; top: 50%; left: 0; transform: translateY(-50%);
+    }
+    #touch-crosshair .ch-dot {
+      position: absolute; width: 6px; height: 6px;
+      border: 1.5px solid rgba(210,30,30,1);
+      border-radius: 50%;
+      left: 50%; top: 50%; transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.7);
+    }
+    #touch-finger-dot {
+      display: none;
+      position: fixed;
+      width: 20px; height: 20px;
+      border: 2px solid rgba(210,30,30,0.4);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 799;
+      transform: translate(-50%, -50%);
+      background: rgba(210,30,30,0.08);
+    }
   </style>
 </head>
 <body>
@@ -1481,6 +1519,8 @@
   <div class="tt-sep"></div>
   <button id="tt-undo" title="Rückgängig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg><span>Undo</span></button>
 </div>
+<div id="touch-crosshair"><div class="ch-v"></div><div class="ch-h"></div><div class="ch-dot"></div></div>
+<div id="touch-finger-dot"></div>
 
 <div id="statusbar">
   <span id="status-tool">Auswahl</span>
@@ -7583,20 +7623,73 @@ function _touchOnOverlay(e) {
 // Verhindere iOS-Bounce/Zoom auf dem Canvas-Bereich
 wrapper.addEventListener('touchmove', e => {
   if (_touchOnOverlay(e)) return; // Overlay-Buttons nicht blockieren
-  if (e.touches.length >= 2 || state.tool !== 'select') {
+  if (e.touches.length >= 2 || state.tool !== 'select' || _touchState.committed === 'pan') {
     e.preventDefault();
   }
 }, { passive: false });
 
-// Eigene Touch-Logik: 1 Finger = Zeichnen/Messen, 2 Finger = Zoom + Pan
-let _touchState = { type: null, lastDist: 0, lastMid: null, startTime: 0 };
+// =========================================================
+// TOUCH: CROSSHAIR + GESTURE STATE MACHINE
+// =========================================================
+let _touchState = { type: null, lastDist: 0, lastMid: null, startTime: 0, startPos: null, committed: null };
+const _CROSSHAIR_OFFSET = 80;
+const _DRAG_THRESHOLD = 10;
+const _LONG_PRESS_MS = 500;
+const _QUICK_TAP_MS = 300;
+let _longPressTimer = null;
 
+const _chEl = document.getElementById('touch-crosshair');
+const _fingerDot = document.getElementById('touch-finger-dot');
+
+function _showCrosshair(cx, cy, fx, fy) {
+  _chEl.style.left = cx + 'px';
+  _chEl.style.top = cy + 'px';
+  _chEl.style.display = 'block';
+  _fingerDot.style.left = fx + 'px';
+  _fingerDot.style.top = fy + 'px';
+  _fingerDot.style.display = 'block';
+}
+function _hideCrosshair() {
+  _chEl.style.display = 'none';
+  _fingerDot.style.display = 'none';
+}
+
+function _crosshairOffset(fingerY) {
+  // Flip offset downward if too close to top
+  return fingerY - _CROSSHAIR_OFFSET < 10 ? _CROSSHAIR_OFFSET : -_CROSSHAIR_OFFSET;
+}
+
+function _useCrosshair() {
+  return state.tool !== 'select' && state.tool !== 'label';
+}
+
+function _dispatchCanvasClick(clientX, clientY) {
+  const rect = canvas.getElement().getBoundingClientRect();
+  const simEvt = new MouseEvent('mousedown', {
+    clientX, clientY,
+    offsetX: clientX - rect.left, offsetY: clientY - rect.top,
+    bubbles: true,
+  });
+  canvas.getElement().dispatchEvent(simEvt);
+  const simUp = new MouseEvent('mouseup', {
+    clientX, clientY,
+    offsetX: clientX - rect.left, offsetY: clientY - rect.top,
+    bubbles: true,
+  });
+  canvas.getElement().dispatchEvent(simUp);
+}
+
+// --- touchstart ---
 wrapper.addEventListener('touchstart', e => {
-  if (_touchOnOverlay(e)) return; // Overlay-Buttons nicht blockieren
+  if (_touchOnOverlay(e)) return;
+
   if (e.touches.length === 2) {
-    // Zwei-Finger-Geste: Zoom + Pan starten
+    // Two-finger: pinch zoom (unchanged)
     e.preventDefault();
+    clearTimeout(_longPressTimer);
+    _hideCrosshair();
     _touchState.type = 'pinch';
+    _touchState.committed = 'pinch';
     _touchState.lastDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
       e.touches[0].clientY - e.touches[1].clientY
@@ -7605,14 +7698,54 @@ wrapper.addEventListener('touchstart', e => {
       x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
       y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
     };
-  } else if (e.touches.length === 1) {
+    return;
+  }
+
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
     _touchState.type = 'single';
     _touchState.startTime = Date.now();
+    _touchState.startPos = { x: t.clientX, y: t.clientY };
+    _touchState.committed = null;
+    _touchState.lastMid = { x: t.clientX, y: t.clientY };
+
+    // Don't show crosshair if touching a selectable/draggable object
+    const target = canvas.findTarget(e.touches[0]);
+    if (target && (target.selectable || target._dimDraggableFoot)) {
+      _touchState.committed = 'fabric';
+      return;
+    }
+
+    // Show crosshair immediately for drawing tools
+    if (_useCrosshair()) {
+      const offY = _crosshairOffset(t.clientY);
+      _showCrosshair(t.clientX, t.clientY + offY, t.clientX, t.clientY);
+
+      // Feed loupe with crosshair position
+      const rect = canvas.getElement().getBoundingClientRect();
+      const chX = t.clientX, chY = t.clientY + offY;
+      _loupe.show();
+      _loupe.update(chX, chY, chX - rect.left, chY - rect.top);
+    }
+
+    // Start long-press timer for pan
+    _longPressTimer = setTimeout(() => {
+      if (_touchState.committed) return; // Already committed to crosshair drag
+      _touchState.committed = 'pan';
+      _hideCrosshair();
+      _loupe.hide();
+      wrapper.classList.add('panning');
+      canvas.defaultCursor = 'grabbing';
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(25);
+    }, _LONG_PRESS_MS);
   }
 }, { passive: false });
 
+// --- touchmove ---
 wrapper.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && _touchState.type === 'pinch') {
+    // Pinch zoom + pan (unchanged)
     e.preventDefault();
     const dist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -7622,30 +7755,44 @@ wrapper.addEventListener('touchmove', e => {
       x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
       y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
     };
-
-    // Zoom
     const factor = dist / _touchState.lastDist;
     const rect = wrapper.getBoundingClientRect();
     setZoom(canvas.getZoom() * factor, {
       x: mid.x - rect.left,
       y: mid.y - rect.top,
     });
-
-    // Pan
     const dx = mid.x - _touchState.lastMid.x;
     const dy = mid.y - _touchState.lastMid.y;
     const vpt = canvas.viewportTransform.slice();
     vpt[4] += dx;
     vpt[5] += dy;
     canvas.setViewportTransform(vpt);
-
     _touchState.lastDist = dist;
     _touchState.lastMid = mid;
-  } else if (e.touches.length === 1 && _touchState.type === 'single' && state.tool === 'select') {
-    // Ein-Finger-Pan im Auswahl-Modus
-    e.preventDefault();
+    return;
+  }
+
+  if (e.touches.length === 1 && _touchState.type === 'single') {
     const t = e.touches[0];
-    if (_touchState.lastMid) {
+    const moved = Math.hypot(t.clientX - _touchState.startPos.x, t.clientY - _touchState.startPos.y);
+
+    // Commit to crosshair mode if drag started before long-press
+    if (!_touchState.committed && moved > _DRAG_THRESHOLD) {
+      clearTimeout(_longPressTimer);
+      _touchState.committed = _useCrosshair() ? 'crosshair' : 'fabric';
+    }
+
+    if (_touchState.committed === 'crosshair') {
+      e.preventDefault();
+      const offY = _crosshairOffset(t.clientY);
+      _showCrosshair(t.clientX, t.clientY + offY, t.clientX, t.clientY);
+      // Update loupe at crosshair position
+      const rect = canvas.getElement().getBoundingClientRect();
+      const chX = t.clientX, chY = t.clientY + offY;
+      _loupe.show();
+      _loupe.update(chX, chY, chX - rect.left, chY - rect.top);
+    } else if (_touchState.committed === 'pan') {
+      e.preventDefault();
       const dx = t.clientX - _touchState.lastMid.x;
       const dy = t.clientY - _touchState.lastMid.y;
       const vpt = canvas.viewportTransform.slice();
@@ -7653,35 +7800,41 @@ wrapper.addEventListener('touchmove', e => {
       vpt[5] += dy;
       canvas.setViewportTransform(vpt);
     }
+    // 'fabric' committed: let Fabric.js handle natively (object drag in select mode)
+
     _touchState.lastMid = { x: t.clientX, y: t.clientY };
   }
 }, { passive: false });
 
+// --- touchend ---
 wrapper.addEventListener('touchend', e => {
   if (e.touches.length === 0) {
-    // Ein-Finger-Tap = Klick (für Messwerkzeuge)
-    if (_touchState.type === 'single' && state.tool !== 'select') {
+    clearTimeout(_longPressTimer);
+    _hideCrosshair();
+    _loupe.hide();
+
+    if (_touchState.committed === 'pan') {
+      wrapper.classList.remove('panning');
+      canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
+    } else if (_touchState.committed === 'crosshair' && e.changedTouches.length === 1) {
+      // Place point at crosshair position
+      const t = e.changedTouches[0];
+      const offY = _crosshairOffset(t.clientY);
+      _dispatchCanvasClick(t.clientX, t.clientY + offY);
+    } else if (!_touchState.committed && _touchState.type === 'single') {
+      // Quick tap — no drag, no long-press
       const elapsed = Date.now() - _touchState.startTime;
-      if (elapsed < 300 && e.changedTouches.length === 1) {
+      if (elapsed < _QUICK_TAP_MS && e.changedTouches.length === 1) {
         const t = e.changedTouches[0];
-        const rect = canvas.getElement().getBoundingClientRect();
-        // Simuliere Mausklick an Touch-Position
-        const simEvt = new MouseEvent('mousedown', {
-          clientX: t.clientX,
-          clientY: t.clientY,
-          bubbles: true,
-        });
-        canvas.getElement().dispatchEvent(simEvt);
-        const simUp = new MouseEvent('mouseup', {
-          clientX: t.clientX,
-          clientY: t.clientY,
-          bubbles: true,
-        });
-        canvas.getElement().dispatchEvent(simUp);
+        // Quick tap: place at finger position directly (no crosshair offset)
+        // This matches pre-existing behavior for fast, experienced users
+        _dispatchCanvasClick(t.clientX, t.clientY);
       }
     }
+
     _touchState.type = null;
     _touchState.lastMid = null;
+    _touchState.committed = null;
   }
 }, { passive: true });
 
