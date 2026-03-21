@@ -1135,6 +1135,8 @@
     /* ── Touch-Hilfsstil: verhindert iOS-Gummiband ── */
     html.touch-device { overflow: hidden; position: fixed; width: 100%; height: 100%; }
     html.touch-device body { position: fixed; width: 100%; height: 100%; }
+    html.touch-device #zoom-hud { font-size: 16px; }
+    html.touch-device #status-bar { font-size: 14px; }
   </style>
 </head>
 <body>
@@ -4593,7 +4595,7 @@ function renderDimLinesForPipe(measureId) {
     const isPoint = ref.type === 'point';
 
     // Linienstärke und Größen analog zu anderen Maßen
-    const lw = state.lineWidth || DIM_WIDTH;
+    const lw = (state.lineWidth || DIM_WIDTH) * TOUCH_SCALE;
 
     // Hauptlinie
     const line = new fabric.Line(
@@ -4679,10 +4681,10 @@ function renderDimLinesForPipe(measureId) {
 
     const lbl = new fabric.Text(distLabel, {
       left: lx, top: ly,
-      fontSize: fs, fontWeight: 'bold', fontFamily: 'monospace',
+      fontSize: fs * TOUCH_SCALE, fontWeight: 'bold', fontFamily: 'monospace',
       fill: '#111',
       backgroundColor: DIM_COLOR,
-      padding: 2,
+      padding: 2 * TOUCH_SCALE,
       originX: 'center', originY: 'center',
       selectable: false, evented: false, _noSelect: true,
       _dimLinePipeId: measureId,
@@ -5645,13 +5647,13 @@ function addLabel(x, y, text, color, measureId, userSelectable = false) {
   const sel = userSelectable || measureId !== null;
   const txt = new fabric.Text(text, {
     left: x, top: y,
-    fontSize: state.fontSize,
+    fontSize: state.fontSize * TOUCH_SCALE,
     fill: isLight ? '#000000' : color,
     fontFamily: 'monospace',
     fontWeight: 'bold',
     backgroundColor: isLight ? 'rgba(255,255,255,0.92)' : '',
     shadow: isLight ? '' : '1px 1px 3px rgba(0,0,0,0.9)',
-    padding: isLight ? 3 : 0,
+    padding: isLight ? Math.round(3 * TOUCH_SCALE) : 0,
     selectable: sel, evented: sel,
     _measureId: measureId,
     _userLabel: userSelectable,
@@ -5663,8 +5665,8 @@ function addLabel(x, y, text, color, measureId, userSelectable = false) {
 
 function addEndpointDot(x, y, color, measureId) {
   const dot = new fabric.Circle({
-    left: x, top: y, radius: 1,
-    fill: color, stroke: '#ffffff', strokeWidth: 0.3,
+    left: x, top: y, radius: 1 * TOUCH_SCALE,
+    fill: color, stroke: '#ffffff', strokeWidth: 0.3 * TOUCH_SCALE,
     originX: 'center', originY: 'center',
     selectable: false, evented: false,
     _measureId: measureId !== -1 ? measureId : undefined,
@@ -5680,11 +5682,11 @@ function addRefEndmarks(line, color, measureId) {
   const dy = line.y2 - line.y1;
   const len = Math.hypot(dx, dy);
   if (len < 1) return;
-  const nx = -dy / len * 4;
-  const ny =  dx / len * 4;
+  const nx = -dy / len * 4 * TOUCH_SCALE;
+  const ny =  dx / len * 4 * TOUCH_SCALE;
   [[line.x1, line.y1], [line.x2, line.y2]].forEach(([cx, cy]) => {
     canvas.add(new fabric.Line([cx + nx, cy + ny, cx - nx, cy - ny], {
-      stroke: color, strokeWidth: 0.5,
+      stroke: color, strokeWidth: 0.5 * TOUCH_SCALE,
       selectable: false, evented: false,
       _measureId: measureId, _noSelect: true,
     }));
@@ -5696,11 +5698,11 @@ function addTickMarks(line, color, measureId) {
   const dy = line.y2 - line.y1;
   const len = Math.hypot(dx, dy);
   if (len < 1) return;
-  const nx = -dy / len * 4;
-  const ny =  dx / len * 4;
+  const nx = -dy / len * 4 * TOUCH_SCALE;
+  const ny =  dx / len * 4 * TOUCH_SCALE;
   [[line.x1, line.y1], [line.x2, line.y2]].forEach(([cx, cy]) => {
     canvas.add(new fabric.Line([cx + nx, cy + ny, cx - nx, cy - ny], {
-      stroke: color, strokeWidth: 0.5,
+      stroke: color, strokeWidth: 0.5 * TOUCH_SCALE,
       selectable: false, evented: false,
       _measureId: measureId, _noSelect: true,
     }));
@@ -7466,6 +7468,7 @@ _sidebar.addEventListener('touchend', () => { _drawerTouchY = null; }, { passive
 // =========================================================
 const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (_isTouchDevice) document.documentElement.classList.add('touch-device');
+const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
 
 // Prüfe ob Touch auf dem Drop-Overlay oder dessen Buttons stattfindet
 function _touchOnOverlay(e) {
