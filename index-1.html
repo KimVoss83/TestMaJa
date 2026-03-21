@@ -679,6 +679,27 @@
     #modal-ok { background: #8B3DFF !important; color: #fff !important; }
     #modal-ok:hover { background: #7B2FBE !important; }
 
+    .save-load-option {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 8px;
+      border: 1px solid #e5e7eb; background: #f9fafb;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .save-load-option:hover {
+      border-color: #8B3DFF; background: #f5f0ff;
+      box-shadow: 0 0 0 1px #8B3DFF;
+    }
+    .slo-icon {
+      flex-shrink: 0; width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; border-radius: 8px;
+      border: 1px solid #e5e7eb; color: #6b7280;
+    }
+    .save-load-option:hover .slo-icon { border-color: #c4b5fd; color: #8B3DFF; }
+    .slo-text { flex: 1; font-size: 13px; color: #2d2d2d; line-height: 1.3; }
+    .slo-text strong { font-weight: 600; }
+    .slo-desc { font-size: 11px; color: #9ca3af; }
+
     input[type="file"] { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
     label.file-trigger { cursor: pointer; -webkit-tap-highlight-color: rgba(45,45,45,0.15); }
 
@@ -1124,12 +1145,14 @@
   <div class="header-actions">
     <label for="file-input" class="file-trigger" id="btn-upload" title="Bild oder PDF laden"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bild laden</label>
     <input type="file" id="file-input" accept="image/*,application/pdf" />
-    <button id="btn-save-json" title="Projekt speichern"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
-    <button id="btn-load-json" title="Projekt laden"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
-    <input type="file" id="json-input" accept=".json" />
-    <div class="header-divider"></div>
-    <button id="btn-save-pdf" title="Als PDF exportieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> PDF</button>
-    <button id="btn-save-png" title="Als PNG exportieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button>
+    <button id="btn-central-save" title="Speichern / Exportieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
+    <button id="btn-central-load" title="Laden / Importieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
+    <input type="file" id="json-input" accept=".json" style="display:none;" />
+    <!-- Hidden elements kept for compatibility -->
+    <button id="btn-save-json" style="display:none;"></button>
+    <button id="btn-load-json" style="display:none;"></button>
+    <button id="btn-save-pdf" style="display:none;"></button>
+    <button id="btn-save-png" style="display:none;"></button>
     <div class="header-divider"></div>
     <button id="btn-undo" title="Rückgängig (Ctrl+Z)" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
     <button id="btn-redo" title="Wiederholen (Ctrl+Y)" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
@@ -1265,16 +1288,7 @@
       <div class="acc-body">
         <div class="acc-body-inner">
           <div class="panel">
-            <div style="display:flex;gap:5px;margin-bottom:8px;">
-              <button id="btn-export-leitungen" onclick="exportLeitungen()"
-                title="Leitungen als .json speichern – du legst danach 2 Ankerpunkte fest"
-                style="flex:1;font-size:11px;">Leitungen speichern</button>
-              <button id="btn-import-leitungen"
-                onclick="document.getElementById('leitungen-import-input').click()"
-                title="Gespeicherte Leitungen ins neue Luftbild einmessen"
-                style="flex:1;font-size:11px;">Leitungen laden</button>
-              <input type="file" id="leitungen-import-input" accept=".json" style="display:none;" />
-            </div>
+            <input type="file" id="leitungen-import-input" accept=".json" style="display:none;" />
             <div class="pipe-layer-header">
               <span style="font-size:11px;color:#636366;">Ebene</span>
               <button id="btn-pipe-layer-toggle" class="pipe-layer-toggle-btn" onclick="togglePipeLayer()">Sichtbar</button>
@@ -1343,6 +1357,29 @@
               <button id="btn-grid-toggle" class="pipe-layer-toggle-btn hidden-layer" onclick="toggleGrid()">Ausgeblendet</button>
             </div>
             <div id="grid-info" style="font-size:10.5px;color:#8e8e93;margin-top:2px;">Kein Maßstab gesetzt</div>
+            <div id="grid-controls" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:10.5px;color:#636366;width:62px;flex-shrink:0;">Abstand</label>
+                <select id="grid-step-select" onchange="setGridStep(this.value)" style="flex:1;font-size:11px;padding:3px 4px;border:1px solid #e5e7eb;border-radius:4px;background:#f9fafb;">
+                  <option value="0">Automatisch</option>
+                  <option value="0.1">10 cm</option>
+                  <option value="0.25">25 cm</option>
+                  <option value="0.5">50 cm</option>
+                  <option value="1">1 m</option>
+                  <option value="2">2 m</option>
+                  <option value="5">5 m</option>
+                  <option value="10">10 m</option>
+                  <option value="25">25 m</option>
+                  <option value="50">50 m</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:10.5px;color:#636366;width:62px;flex-shrink:0;">Farbe</label>
+                <input type="color" id="grid-color-input" value="#ffffff" onchange="setGridColor(this.value)" style="width:28px;height:22px;padding:0;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;background:none;" />
+                <input type="range" id="grid-opacity-range" min="5" max="100" value="28" oninput="setGridOpacity(this.value)" style="flex:1;accent-color:#8B3DFF;" />
+                <span id="grid-opacity-label" style="font-size:10px;color:#9ca3af;width:28px;text-align:right;">28%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1497,6 +1534,9 @@ const state = {
   measurements: [],
   // grid
   gridVisible: false,
+  gridStepM: 0,        // 0 = auto
+  gridColor: '#ffffff',
+  gridOpacity: 0.28,
 
   // pipe
   pipeLayerVisible: true,
@@ -4980,10 +5020,15 @@ function drawGrid() {
   // Screen-px per meter
   const pxPerMeter = state.imgDisplayScale * state.scale * zoom;
 
-  // Choose grid step so lines are at least 55px apart
-  const rawStep   = 55 / pxPerMeter;
-  const gridStep  = GRID_NICE_STEPS.find(s => s >= rawStep) || GRID_NICE_STEPS[GRID_NICE_STEPS.length - 1];
-  const stepPx    = gridStep * pxPerMeter;
+  // Choose grid step: fixed or auto (at least 55px apart)
+  let gridStep;
+  if (state.gridStepM > 0) {
+    gridStep = state.gridStepM;
+  } else {
+    const rawStep = 55 / pxPerMeter;
+    gridStep = GRID_NICE_STEPS.find(s => s >= rawStep) || GRID_NICE_STEPS[GRID_NICE_STEPS.length - 1];
+  }
+  const stepPx = gridStep * pxPerMeter;
 
   // Image bounds in screen coords
   const iL = img.left  * zoom + vpt[4];
@@ -5004,15 +5049,22 @@ function drawGrid() {
 
   ctx.save();
 
-  // ── Grid lines ──────────────────────────────────────────
+  // ── Grid lines (Farbe + Deckkraft aus state) ───────────
+  const _gc = state.gridColor || '#ffffff';
+  const _go = state.gridOpacity != null ? state.gridOpacity : 0.28;
+  // Hex → rgb für rgba()
+  const _r = parseInt(_gc.slice(1,3),16), _g = parseInt(_gc.slice(3,5),16), _b = parseInt(_gc.slice(5,7),16);
+  const gridLineStyle = `rgba(${_r},${_g},${_b},${_go})`;
+  const gridAxisStyle = `rgba(${_r},${_g},${_b},${Math.min(1, _go * 2.5)})`;
+
   for (let i = 0; i <= nCols; i++) {
     const x = iL + i * stepPx;
     if (x < iL - 0.5 || x > iR + 0.5) continue;
     ctx.beginPath(); ctx.moveTo(x, iT); ctx.lineTo(x, iB);
     if (i === 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.2; ctx.setLineDash([]);
+      ctx.strokeStyle = gridAxisStyle; ctx.lineWidth = 1.2; ctx.setLineDash([]);
     } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 0.8; ctx.setLineDash([3, 6]);
+      ctx.strokeStyle = gridLineStyle; ctx.lineWidth = 0.8; ctx.setLineDash([3, 6]);
     }
     ctx.stroke();
   }
@@ -5021,9 +5073,9 @@ function drawGrid() {
     if (y < iT - 0.5 || y > iB + 0.5) continue;
     ctx.beginPath(); ctx.moveTo(iL, y); ctx.lineTo(iR, y);
     if (i === 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.2; ctx.setLineDash([]);
+      ctx.strokeStyle = gridAxisStyle; ctx.lineWidth = 1.2; ctx.setLineDash([]);
     } else {
-      ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 0.8; ctx.setLineDash([3, 6]);
+      ctx.strokeStyle = gridLineStyle; ctx.lineWidth = 0.8; ctx.setLineDash([3, 6]);
     }
     ctx.stroke();
   }
@@ -5100,6 +5152,22 @@ function toggleGrid() {
     if (gc) { gc.width = wrapper.clientWidth; gc.height = wrapper.clientHeight; }
     drawGrid();
   }
+}
+
+function setGridStep(val) {
+  state.gridStepM = parseFloat(val) || 0;
+  drawGrid();
+}
+
+function setGridColor(hex) {
+  state.gridColor = hex;
+  drawGrid();
+}
+
+function setGridOpacity(val) {
+  state.gridOpacity = parseInt(val, 10) / 100;
+  document.getElementById('grid-opacity-label').textContent = val + '%';
+  drawGrid();
 }
 
 // =========================================================
@@ -6197,16 +6265,134 @@ function createModal(title, bodyHTML, onConfirm, onCancel, okLabel = 'OK') {
 }
 
 // =========================================================
-// SAVE / LOAD
+// SAVE / LOAD  (Zentrales Modal)
 // =========================================================
-document.getElementById('btn-save-png').onclick = () => {
+
+function _saveOptionHTML(id, icon, title, desc) {
+  return `<label class="save-load-option" data-action="${id}">
+    <span class="slo-icon">${icon}</span>
+    <span class="slo-text"><strong>${title}</strong><br><span class="slo-desc">${desc}</span></span>
+  </label>`;
+}
+
+function openSaveModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'save-load-modal';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <h2>Speichern</h2>
+      <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du speichern?</p>
+      <div id="sl-step1" style="display:flex;flex-direction:column;gap:6px;">
+        ${_saveOptionHTML('save-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>', 'Gesamtes Projekt', 'Alle Messungen, Leitungen, Einstellungen')}
+        ${_saveOptionHTML('save-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Nur Leitungen', 'Leitungen mit Ankerpunkten für neues Luftbild')}
+      </div>
+      <div id="sl-step2" style="display:none;">
+        <p style="margin:0 0 10px;color:#888;font-size:12px;">In welchem Format?</p>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${_saveOptionHTML('fmt-json', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', 'Projektdatei (.json)', 'Zum Weiterarbeiten – kann wieder geladen werden')}
+          ${_saveOptionHTML('fmt-pdf', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', 'PDF', 'Zum Drucken und Teilen')}
+          ${_saveOptionHTML('fmt-png', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', 'Bild (.png)', 'Als hochauflösende Bilddatei')}
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button id="sl-back" style="display:none;">Zurück</button>
+        <button id="sl-close">Abbrechen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => document.body.removeChild(overlay);
+  overlay.querySelector('#sl-close').onclick = close;
+
+  // Step 1: Was speichern?
+  overlay.querySelectorAll('#sl-step1 .save-load-option').forEach(opt => {
+    opt.onclick = () => {
+      const action = opt.dataset.action;
+      if (action === 'save-pipes') {
+        close();
+        exportLeitungen();
+      } else if (action === 'save-project') {
+        overlay.querySelector('#sl-step1').style.display = 'none';
+        overlay.querySelector('#sl-step2').style.display = '';
+        overlay.querySelector('#sl-back').style.display = '';
+        overlay.querySelector('h2').textContent = 'Projekt speichern';
+        overlay.querySelector('p').textContent = 'In welchem Format?';
+      }
+    };
+  });
+
+  // Back button
+  overlay.querySelector('#sl-back').onclick = () => {
+    overlay.querySelector('#sl-step1').style.display = '';
+    overlay.querySelector('#sl-step2').style.display = 'none';
+    overlay.querySelector('#sl-back').style.display = 'none';
+    overlay.querySelector('h2').textContent = 'Speichern';
+    overlay.querySelector('p').textContent = 'Was möchtest du speichern?';
+  };
+
+  // Step 2: Format
+  overlay.querySelectorAll('#sl-step2 .save-load-option').forEach(opt => {
+    opt.onclick = () => {
+      close();
+      const fmt = opt.dataset.action;
+      if (fmt === 'fmt-json') doSaveProjectJSON();
+      else if (fmt === 'fmt-pdf') doSavePDF();
+      else if (fmt === 'fmt-png') doSavePNG();
+    };
+  });
+
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+}
+
+function openLoadModal() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'save-load-modal';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px;">
+      <h2>Laden</h2>
+      <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du laden?</p>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${_saveOptionHTML('load-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', 'Projekt laden (.json)', 'Gespeichertes Projekt öffnen und weiterarbeiten')}
+        ${_saveOptionHTML('load-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Leitungen einmessen', 'Gespeicherte Leitungen in neues Luftbild übertragen')}
+      </div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button id="sl-close">Abbrechen</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const close = () => document.body.removeChild(overlay);
+  overlay.querySelector('#sl-close').onclick = close;
+
+  overlay.querySelectorAll('.save-load-option').forEach(opt => {
+    opt.onclick = () => {
+      close();
+      const action = opt.dataset.action;
+      if (action === 'load-project') document.getElementById('json-input').click();
+      else if (action === 'load-pipes') document.getElementById('leitungen-import-input').click();
+    };
+  });
+
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+}
+
+document.getElementById('btn-central-save').onclick = openSaveModal;
+document.getElementById('btn-central-load').onclick = openLoadModal;
+
+// ─── Einzelne Speicherfunktionen (vom Modal aufgerufen) ───
+
+function doSavePNG() {
   endPipeEdit(); clearPipeDistanceGuides();
   const url = canvas.toDataURL({ format: 'png', multiplier: 3 });
   const a = document.createElement('a');
   a.href = url; a.download = 'gartenplan.png'; a.click();
-};
+}
 
-document.getElementById('btn-save-pdf').onclick = () => {
+document.getElementById('btn-save-png').onclick = doSavePNG;
+
+function doSavePDF() {
   endPipeEdit(); clearPipeDistanceGuides();
   if (!state.backgroundImage) { showToast('Bitte zuerst ein Luftbild laden.'); return; }
   const canvasW = canvas.width;
@@ -6323,9 +6509,10 @@ document.getElementById('btn-save-pdf').onclick = () => {
 
   btn.textContent = 'PDF exportieren';
   btn.disabled = false;
-};
+}
+document.getElementById('btn-save-pdf').onclick = doSavePDF;
 
-document.getElementById('btn-save-json').onclick = () => {
+function doSaveProjectJSON() {
   endPipeEdit();
   clearPipeDistanceGuides();
   const data = {
@@ -6340,6 +6527,9 @@ document.getElementById('btn-save-json').onclick = () => {
     flightCam: state.flightCam || null,
     fontSize: state.fontSize,
     labelBg: state.labelBg,
+    gridStepM: state.gridStepM || 0,
+    gridColor: state.gridColor || '#ffffff',
+    gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
     measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
     pipeReferences: state.pipeReferences,
     activePipeRefs: state.activePipeRefs,
@@ -6348,7 +6538,8 @@ document.getElementById('btn-save-json').onclick = () => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'gartenplan.json'; a.click();
-};
+}
+document.getElementById('btn-save-json').onclick = doSaveProjectJSON;
 
 document.getElementById('btn-load-json').onclick = () => document.getElementById('json-input').click();
 document.getElementById('json-input').onchange = e => {
@@ -6368,6 +6559,14 @@ document.getElementById('json-input').onchange = e => {
       state.flightCam       = data.flightCam || null;
       state.fontSize = (Number.isInteger(data.fontSize) && data.fontSize >= 6 && data.fontSize <= 72) ? data.fontSize : 13;
       state.labelBg  = data.labelBg === true;
+      state.gridStepM  = (typeof data.gridStepM === 'number') ? data.gridStepM : 0;
+      state.gridColor  = (typeof data.gridColor === 'string' && /^#[0-9a-f]{6}$/i.test(data.gridColor)) ? data.gridColor : '#ffffff';
+      state.gridOpacity = (typeof data.gridOpacity === 'number') ? data.gridOpacity : 0.28;
+      // Update grid UI controls
+      const _gss = document.getElementById('grid-step-select'); if (_gss) _gss.value = String(state.gridStepM);
+      const _gci = document.getElementById('grid-color-input'); if (_gci) _gci.value = state.gridColor;
+      const _gor = document.getElementById('grid-opacity-range'); if (_gor) _gor.value = Math.round(state.gridOpacity * 100);
+      const _gol = document.getElementById('grid-opacity-label'); if (_gol) _gol.textContent = Math.round(state.gridOpacity * 100) + '%';
       state.measurements = (data.measurements || []).map(m => ({ ...m }));
       state.pipeReferences = Array.isArray(data.pipeReferences) ? data.pipeReferences : [];
       state.activePipeRefs = Array.isArray(data.activePipeRefs) ? data.activePipeRefs : [];
