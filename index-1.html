@@ -7547,6 +7547,13 @@ _sidebar.addEventListener('touchmove', e => {
 _sidebar.addEventListener('touchend', () => { _drawerTouchY = null; }, { passive: true });
 
 // =========================================================
+// MOBILE: TOUCH EVENTS FÜR CANVAS
+// =========================================================
+const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (_isTouchDevice) document.documentElement.classList.add('touch-device');
+const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
+
+// =========================================================
 // MOBILE: BOTTOM TOUCH TOOLBAR
 // =========================================================
 if (_isTouchDevice) {
@@ -7566,13 +7573,6 @@ if (_isTouchDevice) {
   };
   document.getElementById('tt-undo').onclick = () => undo();
 }
-
-// =========================================================
-// MOBILE: TOUCH EVENTS FÜR CANVAS
-// =========================================================
-const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-if (_isTouchDevice) document.documentElement.classList.add('touch-device');
-const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
 
 // Prüfe ob Touch auf dem Drop-Overlay oder dessen Buttons stattfindet
 function _touchOnOverlay(e) {
