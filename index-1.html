@@ -2058,8 +2058,8 @@ function setTool(t) {
   canvas.forEachObject(o => {
     o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib;
+    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot;
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
@@ -4405,8 +4405,9 @@ function segmentToSegmentClosest(a1, a2, b1, b2) {
 }
 
 // ─── Maßlinien: Berechnung ────────────────────────────────
-// Gibt { footOnRef, footOnPipe, dist_m } oder null zurück
-function computeDimLine(pipePolyline, ref) {
+// Gibt { footOnRef, footOnPipe, dist_m, t } oder null zurück
+// overrideT: optionaler Parameter t (Position auf Hilfslinie), wenn vom Nutzer gesetzt
+function computeDimLine(pipePolyline, ref, overrideT) {
   if (!pipePolyline || !ref) return null;
 
   // Hole absolute Canvas-Punkte der Pipe-Polylinie
@@ -4420,35 +4421,57 @@ function computeDimLine(pipePolyline, ref) {
 
   let bestFootOnRef = null, bestFootOnPipe = null, bestDist = Infinity;
 
-  for (let i = 0; i < absPts.length - 1; i++) {
-    const a1 = absPts[i], a2 = absPts[i + 1];
-
-    let footRef, footPipe, dist;
-    if (ref.type === 'line') {
-      const r = segmentToSegmentClosest(
-        { x: ref.x1, y: ref.y1 }, { x: ref.x2, y: ref.y2 },
-        a1, a2
-      );
-      footRef = r.footA; footPipe = r.footB; dist = r.dist;
-    } else {
-      // RefPoint: Lot vom Punkt auf Pipe-Segment
-      footRef = { x: ref.x, y: ref.y };
-      footPipe = closestPointOnSegment({ x: ref.x, y: ref.y }, a1, a2);
-      dist = Math.hypot(footRef.x - footPipe.x, footRef.y - footPipe.y);
+  if (ref.type === 'line' && overrideT != null) {
+    // Nutzer hat Fußpunkt auf Hilfslinie manuell gewählt (Parameter t)
+    const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
+    bestFootOnRef = { x: ref.x1 + overrideT * dx, y: ref.y1 + overrideT * dy };
+    // Lot vom gewählten Ref-Punkt auf nächstes Pipe-Segment
+    for (let i = 0; i < absPts.length - 1; i++) {
+      const fp = closestPointOnSegment(bestFootOnRef, absPts[i], absPts[i + 1]);
+      const d = Math.hypot(bestFootOnRef.x - fp.x, bestFootOnRef.y - fp.y);
+      if (d < bestDist) { bestDist = d; bestFootOnPipe = fp; }
     }
+  } else {
+    for (let i = 0; i < absPts.length - 1; i++) {
+      const a1 = absPts[i], a2 = absPts[i + 1];
 
-    if (dist < bestDist) {
-      bestDist = dist; bestFootOnRef = footRef; bestFootOnPipe = footPipe;
+      let footRef, footPipe, dist;
+      if (ref.type === 'line') {
+        const r = segmentToSegmentClosest(
+          { x: ref.x1, y: ref.y1 }, { x: ref.x2, y: ref.y2 },
+          a1, a2
+        );
+        footRef = r.footA; footPipe = r.footB; dist = r.dist;
+      } else {
+        // RefPoint: Lot vom Punkt auf Pipe-Segment
+        footRef = { x: ref.x, y: ref.y };
+        footPipe = closestPointOnSegment({ x: ref.x, y: ref.y }, a1, a2);
+        dist = Math.hypot(footRef.x - footPipe.x, footRef.y - footPipe.y);
+      }
+
+      if (dist < bestDist) {
+        bestDist = dist; bestFootOnRef = footRef; bestFootOnPipe = footPipe;
+      }
     }
   }
 
   if (bestDist < 1 || !bestFootOnRef) return null;
 
+  // t-Wert für Hilfslinie berechnen (für Persistenz)
+  let tOnRef = overrideT;
+  if (tOnRef == null && ref.type === 'line') {
+    const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
+    const lenSq = dx * dx + dy * dy;
+    tOnRef = lenSq > 1e-9
+      ? ((bestFootOnRef.x - ref.x1) * dx + (bestFootOnRef.y - ref.y1) * dy) / lenSq
+      : 0;
+  }
+
   // Umrechnung in Meter (imgDisplayScale kompensieren)
   const pxDist = bestDist / (state.imgDisplayScale || 1);
   const dist_m = state.scale ? pxDist / state.scale : null;
 
-  return { footOnRef: bestFootOnRef, footOnPipe: bestFootOnPipe, dist_m };
+  return { footOnRef: bestFootOnRef, footOnPipe: bestFootOnPipe, dist_m, t: tOnRef };
 }
 
 const DIM_COLOR  = '#FFD700';
@@ -4471,16 +4494,20 @@ function renderDimLinesForPipe(measureId) {
   );
   if (!polyline) return;
 
+  if (!meas.dimFootOverrides) meas.dimFootOverrides = {};
+
   const dimObjs = [];
 
   meas.refs.forEach(refId => {
     const ref = state.pipeReferences.find(r => r.id === refId);
     if (!ref) return;
 
-    const result = computeDimLine(polyline, ref);
+    const override = meas.dimFootOverrides[refId];
+    const overrideT = (ref.type === 'line' && override != null) ? override.t : undefined;
+    const result = computeDimLine(polyline, ref, overrideT);
     if (!result) return;
 
-    const { footOnRef, footOnPipe, dist_m } = result;
+    const { footOnRef, footOnPipe, dist_m, t: computedT } = result;
     const isPoint = ref.type === 'point';
 
     // Linienstärke und Größen analog zu anderen Maßen
@@ -4499,13 +4526,23 @@ function renderDimLinesForPipe(measureId) {
     );
     dimObjs.push(line);
 
-    // Fußpunkt auf Referenz: gefüllter Kreis orange
+    // Fußpunkt auf Referenz: gefüllter Kreis orange — bei Hilfslinien verschiebbar
+    const isLineRef = ref.type === 'line';
+    const dotRadius = isLineRef ? Math.max(5, lw * 3.5) : Math.max(3, lw * 2.5);
     const dotRef = new fabric.Circle({
-      left: footOnRef.x, top: footOnRef.y, radius: Math.max(3, lw * 2.5),
-      fill: '#FF9800', stroke: 'none',
+      left: footOnRef.x, top: footOnRef.y, radius: dotRadius,
+      fill: '#FF9800', stroke: isLineRef ? '#E65100' : 'none',
+      strokeWidth: isLineRef ? 1.5 : 0,
       originX: 'center', originY: 'center',
-      selectable: false, evented: false, _noSelect: true,
+      selectable: isLineRef, evented: isLineRef,
+      hasControls: false, hasBorders: false,
+      hoverCursor: isLineRef ? 'grab' : 'default',
+      moveCursor: isLineRef ? 'grabbing' : 'default',
+      _noSelect: !isLineRef,
       _dimLinePipeId: measureId,
+      _dimDraggableFoot: isLineRef,
+      _dimRefId: refId,
+      _dimMeasureId: measureId,
     });
     dimObjs.push(dotRef);
 
@@ -4582,6 +4619,85 @@ function renderAllDimLines() {
     .filter(m => m.type === 'pipe')
     .forEach(m => renderDimLinesForPipe(m.id));
 }
+
+// ─── Verschiebbarer Fußpunkt auf Hilfslinie ──────────────
+// Drag-Constraint: Punkt wird auf die Hilfslinie projiziert
+canvas.on('object:moving', opt => {
+  const obj = opt.target;
+  if (!obj || !obj._dimDraggableFoot) return;
+
+  const refId = obj._dimRefId;
+  const ref = state.pipeReferences.find(r => r.id === refId);
+  if (!ref || ref.type !== 'line') return;
+
+  // Projiziere Mausposition auf die Hilfslinie (unclamped — darf über Enden hinaus)
+  const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) return;
+  const t = ((obj.left - ref.x1) * dx + (obj.top - ref.y1) * dy) / lenSq;
+  // Position auf Linie setzen
+  obj.left = ref.x1 + t * dx;
+  obj.top  = ref.y1 + t * dy;
+  obj.setCoords();
+});
+
+// Nach dem Loslassen: Override speichern und Maßlinie neu rendern
+canvas.on('object:modified', opt => {
+  const obj = opt.target;
+  if (!obj || !obj._dimDraggableFoot) return;
+
+  const refId = obj._dimRefId;
+  const measId = obj._dimMeasureId;
+  const ref = state.pipeReferences.find(r => r.id === refId);
+  const meas = state.measurements.find(m => m.id === measId);
+  if (!ref || !meas || ref.type !== 'line') return;
+
+  // t berechnen
+  const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) return;
+  const t = ((obj.left - ref.x1) * dx + (obj.top - ref.y1) * dy) / lenSq;
+
+  if (!meas.dimFootOverrides) meas.dimFootOverrides = {};
+  meas.dimFootOverrides[refId] = { t };
+
+  // Maßlinie komplett neu rendern mit neuem Fußpunkt
+  renderDimLinesForPipe(measId);
+  // saveSnapshot() wird vom globalen object:modified-Handler aufgerufen
+});
+
+// Hover-Hinweis für verschiebbare Fußpunkte
+canvas.on('mouse:over', opt => {
+  if (opt.target && opt.target._dimDraggableFoot) {
+    const hint = document.getElementById('status-hint');
+    if (hint) hint.textContent = 'Fußpunkt verschieben · Doppelklick = Zurücksetzen';
+  }
+});
+canvas.on('mouse:out', opt => {
+  if (opt.target && opt.target._dimDraggableFoot) {
+    const hint = document.getElementById('status-hint');
+    if (hint) hint.textContent = '';
+  }
+});
+
+// Doppelklick auf Fußpunkt: Reset auf automatische Berechnung
+canvas.on('mouse:dblclick', opt => {
+  const obj = opt.target;
+  if (!obj || !obj._dimDraggableFoot) return;
+
+  const refId = obj._dimRefId;
+  const measId = obj._dimMeasureId;
+  const meas = state.measurements.find(m => m.id === measId);
+  if (!meas) return;
+
+  // Override entfernen
+  if (meas.dimFootOverrides) {
+    delete meas.dimFootOverrides[refId];
+  }
+
+  renderDimLinesForPipe(measId);
+  saveSnapshot();
+});
 
 // ─── Zuordnen-Modus ──────────────────────────────────────
 function startAssignMode(measureId) {
@@ -6213,7 +6329,7 @@ document.getElementById('btn-save-json').onclick = () => {
     flightCam: state.flightCam || null,
     fontSize: state.fontSize,
     labelBg: state.labelBg,
-    measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null })),
+    measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
     pipeReferences: state.pipeReferences,
     activePipeRefs: state.activePipeRefs,
     canvas: canvas.toJSON(['_measureId','_isRef','_noSelect','_circlePreview','_arcPreview','_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset','_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib']),
