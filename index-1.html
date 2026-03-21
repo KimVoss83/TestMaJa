@@ -7636,7 +7636,11 @@ const _CROSSHAIR_OFFSET = 80;
 const _DRAG_THRESHOLD = 10;
 const _LONG_PRESS_MS = 500;
 const _QUICK_TAP_MS = 300;
+const _PINCH_COOLDOWN_MS = 350;
 let _longPressTimer = null;
+let _pinchCooldownUntil = 0;   // Timestamp: ignoriere Taps bis hierhin
+let _lastTapTime = 0;           // Für Doppeltipp-Erkennung
+const _DOUBLE_TAP_MS = 400;
 
 const _chEl = document.getElementById('touch-crosshair');
 const _fingerDot = document.getElementById('touch-finger-dot');
@@ -7663,28 +7667,49 @@ function _useCrosshair() {
   return state.tool !== 'select' && state.tool !== 'label';
 }
 
-function _dispatchCanvasClick(clientX, clientY) {
+// Konvertiere clientX/clientY → Canvas-Koordinaten und rufe die App-Handler direkt auf
+function _handleTouchPoint(clientX, clientY) {
   const rect = canvas.getElement().getBoundingClientRect();
-  const simEvt = new MouseEvent('mousedown', {
-    clientX, clientY,
-    offsetX: clientX - rect.left, offsetY: clientY - rect.top,
-    bubbles: true,
-  });
-  canvas.getElement().dispatchEvent(simEvt);
-  const simUp = new MouseEvent('mouseup', {
-    clientX, clientY,
-    offsetX: clientX - rect.left, offsetY: clientY - rect.top,
-    bubbles: true,
-  });
-  canvas.getElement().dispatchEvent(simUp);
+  const offsetX = clientX - rect.left;
+  const offsetY = clientY - rect.top;
+  // Fabric.js getPointer braucht ein event-ähnliches Objekt
+  const fakeEvt = { clientX, clientY, offsetX, offsetY };
+  const pRaw = canvas.getPointer(fakeEvt);
+  const p = (state.tool !== 'select' && state.tool !== 'label') ? snapToPixel(pRaw) : pRaw;
+
+  // Gleiche Logik wie canvas.on('mouse:down') — direkt aufrufen
+  if (_anchorExport.active || _anchorImport.active) { handleLeitungenAlignClick(p); return; }
+  if (['select','ref','distance','area','circle','arc','pipe'].includes(state.tool) && handlePipeRefClick(p)) return;
+
+  switch (state.tool) {
+    case 'ref':      handleRefClick(p); break;
+    case 'distance': handleDistanceClick(p); break;
+    case 'area':     handleAreaClick(p); break;
+    case 'circle':   handleCircleClick(p); break;
+    case 'arc':      handleArcClick(p); break;
+    case 'label':    promptLabel(p); break;
+    case 'pipe':     handlePipeClick(p); break;
+  }
+}
+
+// Für Doppeltipp (Area/Pipe abschließen)
+function _handleTouchDoubleTap() {
+  if (state.tool === 'area' && state.areaPoints.length >= 3) { finishArea(); return; }
+  if (state.tool === 'pipe' && state.pipePoints.length >= 2) { finishPipe(); return; }
 }
 
 // --- touchstart ---
 wrapper.addEventListener('touchstart', e => {
   if (_touchOnOverlay(e)) return;
 
+  // Auf Touch-Geräten: Fabric.js darf Touch-Events NICHT selbst verarbeiten.
+  // Wir steuern alles über unsere State-Machine und rufen App-Handler direkt auf.
+  if (_isTouchDevice && state.tool !== 'select') {
+    e.preventDefault();
+  }
+
   if (e.touches.length === 2) {
-    // Two-finger: pinch zoom (unchanged)
+    // Two-finger: pinch zoom
     e.preventDefault();
     clearTimeout(_longPressTimer);
     _hideCrosshair();
@@ -7702,6 +7727,12 @@ wrapper.addEventListener('touchstart', e => {
   }
 
   if (e.touches.length === 1) {
+    // Post-Pinch Cooldown: ignoriere Touch-Input kurz nach dem Zoomen
+    if (Date.now() < _pinchCooldownUntil) {
+      _touchState.type = 'cooldown';
+      return;
+    }
+
     const t = e.touches[0];
     _touchState.type = 'single';
     _touchState.startTime = Date.now();
@@ -7730,13 +7761,12 @@ wrapper.addEventListener('touchstart', e => {
 
     // Start long-press timer for pan
     _longPressTimer = setTimeout(() => {
-      if (_touchState.committed) return; // Already committed to crosshair drag
+      if (_touchState.committed) return;
       _touchState.committed = 'pan';
       _hideCrosshair();
       _loupe.hide();
       wrapper.classList.add('panning');
       canvas.defaultCursor = 'grabbing';
-      // Haptic feedback if available
       if (navigator.vibrate) navigator.vibrate(25);
     }, _LONG_PRESS_MS);
   }
@@ -7813,30 +7843,57 @@ wrapper.addEventListener('touchend', e => {
     _hideCrosshair();
     _loupe.hide();
 
-    if (_touchState.committed === 'pan') {
+    if (_touchState.type === 'pinch' || _touchState.committed === 'pinch') {
+      // Nach Pinch-Zoom: Cooldown setzen, damit der letzte Finger-Lift
+      // keinen Punkt setzt
+      _pinchCooldownUntil = Date.now() + _PINCH_COOLDOWN_MS;
+      wrapper.classList.remove('panning');
+    } else if (_touchState.committed === 'pan') {
       wrapper.classList.remove('panning');
       canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
     } else if (_touchState.committed === 'crosshair' && e.changedTouches.length === 1) {
-      // Place point at crosshair position
+      // Place point at crosshair position (offset vom Finger)
       const t = e.changedTouches[0];
       const offY = _crosshairOffset(t.clientY);
-      _dispatchCanvasClick(t.clientX, t.clientY + offY);
-    } else if (!_touchState.committed && _touchState.type === 'single') {
-      // Quick tap — no drag, no long-press
+      const now = Date.now();
+      // Doppeltipp-Erkennung
+      if (now - _lastTapTime < _DOUBLE_TAP_MS) {
+        _handleTouchDoubleTap();
+        _lastTapTime = 0;
+      } else {
+        _handleTouchPoint(t.clientX, t.clientY + offY);
+        _lastTapTime = now;
+      }
+    } else if (_touchState.type === 'single' && !_touchState.committed) {
+      // Quick tap — kein Drag, kein Long-Press
       const elapsed = Date.now() - _touchState.startTime;
       if (elapsed < _QUICK_TAP_MS && e.changedTouches.length === 1) {
         const t = e.changedTouches[0];
-        // Quick tap: place at finger position directly (no crosshair offset)
-        // This matches pre-existing behavior for fast, experienced users
-        _dispatchCanvasClick(t.clientX, t.clientY);
+        const now = Date.now();
+        // Doppeltipp
+        if (now - _lastTapTime < _DOUBLE_TAP_MS) {
+          _handleTouchDoubleTap();
+          _lastTapTime = 0;
+        } else {
+          // Quick tap: Punkt am Fadenkreuz-Offset (nicht an Fingerposition!)
+          // Das Fadenkreuz war sichtbar, der Nutzer hat es gesehen
+          if (_useCrosshair()) {
+            const offY = _crosshairOffset(t.clientY);
+            _handleTouchPoint(t.clientX, t.clientY + offY);
+          } else {
+            _handleTouchPoint(t.clientX, t.clientY);
+          }
+          _lastTapTime = now;
+        }
       }
     }
+    // Cooldown-Touch: nichts tun (absichtlich ignoriert)
 
     _touchState.type = null;
     _touchState.lastMid = null;
     _touchState.committed = null;
   }
-}, { passive: true });
+}, { passive: false });
 
 // =========================================================
 // MOBILE: CANVAS-GRÖßE BEI ORIENTATION-CHANGE
