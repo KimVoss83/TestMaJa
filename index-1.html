@@ -1272,6 +1272,51 @@
       bottom: 62px;
     }
     html.touch-device #sidebar.drawer-open ~ #touch-toolbar { display: none !important; }
+
+    /* ── Mobile Pipe-Type Selector ── */
+    #mobile-pipe-bar {
+      display: none;
+      position: fixed;
+      bottom: 56px;
+      bottom: calc(56px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      z-index: 489;
+      background: rgba(40,40,50,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 8px;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #mobile-pipe-bar::-webkit-scrollbar { display: none; }
+    html.touch-device #mobile-pipe-bar.visible { display: flex; }
+    .mp-chip {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 11px; font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .mp-chip .mp-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mp-chip.active {
+      background: rgba(255,255,255,0.25);
+      border-color: #fff;
+    }
+
     @media (orientation: landscape) {
       #touch-toolbar button span { display: none; }
       #touch-toolbar button { min-width: 40px; padding: 4px; }
@@ -1661,6 +1706,7 @@
 <div id="mobile-crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
 <button id="mobile-finish-btn" title="Messung abschließen">✓</button>
 
+<div id="mobile-pipe-bar"></div>
 <div id="touch-toolbar">
   <button id="tt-select" title="Auswahl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Auswahl</span></button>
   <button id="tt-ref" title="Maßstab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 12h4"/></svg><span>Maßstab</span></button>
@@ -2454,6 +2500,9 @@ function setTool(t) {
   document.getElementById('status-tool').textContent = 'Werkzeug: ' + TOOL_NAMES[t];
   document.getElementById('status-hint').textContent = TOOL_HINTS[t];
   document.getElementById('pipe-type-group').style.display = (t === 'pipe') ? '' : 'none';
+  // Mobile pipe bar
+  const mpb = document.getElementById('mobile-pipe-bar');
+  if (mpb) mpb.classList.toggle('visible', t === 'pipe');
   const REF_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
   if (!REF_TOOLS.includes(t)) { state.pipeRefMode = null; state.pipeRefTempPt = null; }
   // Sections stay collapsed — notification badges show new items
@@ -2476,6 +2525,28 @@ Object.keys(TOOL_NAMES).forEach(id => {
   });
   sel.value = state.pipeType;
   sel.onchange = () => { state.pipeType = sel.value; };
+})();
+
+// Mobile pipe type bar
+(function initMobilePipeBar() {
+  const bar = document.getElementById('mobile-pipe-bar');
+  if (!bar) return;
+  const MAIN_PIPE_KEYS = ['TW','AW','RW','GB','G','St','GF','Cu','LR'];
+  MAIN_PIPE_KEYS.forEach(key => {
+    const pt = PIPE_TYPES[key];
+    const chip = document.createElement('button');
+    chip.className = 'mp-chip';
+    chip.dataset.key = key;
+    chip.innerHTML = `<span class="mp-dot" style="background:${pt.color}"></span>${pt.label}`;
+    if (key === state.pipeType) chip.classList.add('active');
+    chip.onclick = () => {
+      state.pipeType = key;
+      document.getElementById('pipe-type-select').value = key;
+      bar.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    };
+    bar.appendChild(chip);
+  });
 })();
 
 // Init pipe ref list
