@@ -1138,6 +1138,37 @@
     html.touch-device #zoom-hud { font-size: 16px; }
     html.touch-device #status-bar { font-size: 14px; }
 
+    /* ── Mobile Magnifier Circles (Start / End) ── */
+    .mobile-mag {
+      display: none;
+      position: fixed;
+      top: 60px;
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(0,0,0,0.22);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22), inset 0 0 0 1.5px rgba(255,255,255,0.5);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 9998;
+      background: #fff;
+    }
+    .mobile-mag canvas { display: block; }
+    .mobile-mag-label {
+      position: absolute;
+      bottom: 6px; left: 0; right: 0;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      pointer-events: none;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #mobile-mag-start { left: 12px; }
+    #mobile-mag-end { right: 12px; }
+    html.touch-device .mobile-mag.visible { display: block; }
+
     /* ── Mobile Bottom Toolbar ── */
     #touch-toolbar {
       display: none;
@@ -1467,6 +1498,9 @@
 
 <div id="drawer-backdrop"></div>
 <button id="mobile-drawer-toggle">Messungen & Bibliothek ▲</button>
+
+<div id="mobile-mag-start" class="mobile-mag"><span class="mobile-mag-label">Anfang</span></div>
+<div id="mobile-mag-end" class="mobile-mag"><span class="mobile-mag-label">Ende</span></div>
 
 <div id="touch-toolbar">
   <button id="tt-select" title="Auswahl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Auswahl</span></button>
@@ -2171,6 +2205,7 @@ function setTool(t) {
   canvas.selection = (t === 'select');
   canvas.defaultCursor = t === 'select' ? 'default' : 'crosshair';
   if (t === 'select') _loupe.hide();
+  if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
   canvas.forEachObject(o => {
     o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
     o.evented = o.selectable;
@@ -3283,9 +3318,48 @@ canvas.on('mouse:move', opt => {
     !state.panning && !state.spacePan && !!state.backgroundImage;
   if (_loupeActive) { _loupe.show(); _loupe.update(opt.e.clientX, opt.e.clientY, opt.e.offsetX, opt.e.offsetY); }
   else              { _loupe.hide(); }
+
+  // Mobile Magnifiers: Anfang (links) + Ende/Cursor (rechts)
+  if (_isTouchDevice && _loupeActive) {
+    const col = state.color || 'rgba(210,30,30,0.92)';
+    // Startpunkt-Lupe (links): zeigt den bereits gesetzten Anfangspunkt
+    let hasStart = false;
+    if (state.tool === 'ref' && state.refPoints.length === 1) {
+      _mobileMag.updateStart(state.refPoints[0].x, state.refPoints[0].y, '#cc0000');
+      hasStart = true;
+    } else if (state.tool === 'distance' && state.distPoints.length === 1) {
+      _mobileMag.updateStart(state.distPoints[0].x, state.distPoints[0].y, col);
+      hasStart = true;
+    } else if (state.tool === 'circle' && state.circleCenter) {
+      _mobileMag.updateStart(state.circleCenter.x, state.circleCenter.y, col);
+      hasStart = true;
+    } else if (state.tool === 'arc' && state.arcStep >= 1 && state.arcCenter) {
+      _mobileMag.updateStart(state.arcCenter.x, state.arcCenter.y, col);
+      hasStart = true;
+    } else if (state.tool === 'area' && state.areaPoints.length >= 1) {
+      const lastPt = state.areaPoints[state.areaPoints.length - 1];
+      _mobileMag.updateStart(lastPt.x, lastPt.y, col);
+      hasStart = true;
+    } else if (state.tool === 'pipe' && state.pipePoints.length >= 1) {
+      const lastPt = state.pipePoints[state.pipePoints.length - 1];
+      _mobileMag.updateStart(lastPt.x, lastPt.y, col);
+      hasStart = true;
+    }
+    if (!hasStart) { _mobileMag.hideStart(); }
+
+    // Endpunkt/Cursor-Lupe (rechts): zeigt die aktuelle Fingerposition
+    if (hasStart || state.tool !== 'select') {
+      _mobileMag.updateEnd(p.x, p.y, col);
+    }
+    if (!hasStart && state.tool !== 'select') {
+      _mobileMag.hideStart();
+    }
+  } else if (_isTouchDevice) {
+    _mobileMag.hide();
+  }
 });
 
-canvas.on('mouse:out', () => _loupe.hide());
+canvas.on('mouse:out', () => { _loupe.hide(); if (_isTouchDevice) _mobileMag.hide(); });
 
 // Snap-to-Pixel: Rastet Koordinaten auf das nächste Original-Bildpixel ein,
 // damit Messungen wiederholbar und konsistent sind.
@@ -7609,6 +7683,111 @@ if (_isTouchDevice) {
   const _origLoupeShow = _loupe.show;
   _loupe.show = function() { /* noop auf Touch */ };
 }
+
+// =========================================================
+// MOBILE MAGNIFIER: Zwei Lupen-Kreise (Anfang links, Ende rechts)
+// =========================================================
+const _mobileMag = (() => {
+  if (!_isTouchDevice) return { show() {}, hide() {}, updateStart() {}, updateEnd() {}, hideStart() {}, hideEnd() {}, active: false };
+
+  const SIZE = 130, ZOOM = 4;
+  const dpr = () => window.devicePixelRatio || 1;
+
+  function createMagCanvas(container) {
+    const c = document.createElement('canvas');
+    container.insertBefore(c, container.firstChild);
+    const d = dpr();
+    c.width = SIZE * d;
+    c.height = SIZE * d;
+    c.style.width = SIZE + 'px';
+    c.style.height = SIZE + 'px';
+    return { canvas: c, ctx: c.getContext('2d') };
+  }
+
+  const startEl = document.getElementById('mobile-mag-start');
+  const endEl = document.getElementById('mobile-mag-end');
+  const startMag = createMagCanvas(startEl);
+  const endMag = createMagCanvas(endEl);
+
+  function renderMag(mag, canvasX, canvasY, color) {
+    const d = dpr();
+    const ctx = mag.ctx;
+    const c = mag.canvas;
+
+    // Resize if needed
+    if (c.width !== SIZE * d) {
+      c.width = SIZE * d;
+      c.height = SIZE * d;
+      c.style.width = SIZE + 'px';
+      c.style.height = SIZE + 'px';
+    }
+
+    // Convert canvas coordinates to pixel position on lowerCanvasEl
+    const vpt = canvas.viewportTransform;
+    const screenX = canvasX * vpt[0] + vpt[4];
+    const screenY = canvasY * vpt[3] + vpt[5];
+    const cpx = screenX * d;
+    const cpy = screenY * d;
+
+    const srcW = (SIZE / ZOOM) * d;
+    const srcH = (SIZE / ZOOM) * d;
+    const srcX = cpx - srcW / 2;
+    const srcY = cpy - srcH / 2;
+
+    ctx.clearRect(0, 0, SIZE * d, SIZE * d);
+    try { ctx.drawImage(canvas.lowerCanvasEl, srcX, srcY, srcW, srcH, 0, 0, SIZE * d, SIZE * d); } catch(_) {}
+
+    // Crosshair
+    ctx.save();
+    ctx.scale(d, d);
+    const h = SIZE / 2;
+    const GAP = 6;
+
+    // White halo
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.beginPath(); ctx.arc(h, h, GAP + 1, 0, Math.PI * 2); ctx.fill();
+
+    // Dashed crosshair
+    ctx.strokeStyle = color || 'rgba(210,30,30,0.92)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(0, h); ctx.lineTo(h - GAP, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h + GAP, h); ctx.lineTo(SIZE, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h, 0); ctx.lineTo(h, h - GAP); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h, h + GAP); ctx.lineTo(h, SIZE); ctx.stroke();
+
+    // Center dot
+    ctx.setLineDash([]);
+    ctx.strokeStyle = color || 'rgba(210,30,30,1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(h, h, 2.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  let _active = false;
+
+  return {
+    get active() { return _active; },
+    updateStart(canvasX, canvasY, color) {
+      startEl.classList.add('visible');
+      _active = true;
+      renderMag(startMag, canvasX, canvasY, color);
+    },
+    updateEnd(canvasX, canvasY, color) {
+      endEl.classList.add('visible');
+      _active = true;
+      renderMag(endMag, canvasX, canvasY, color);
+    },
+    hideStart() { startEl.classList.remove('visible'); },
+    hideEnd() { endEl.classList.remove('visible'); },
+    show() { _active = true; },
+    hide() {
+      _active = false;
+      startEl.classList.remove('visible');
+      endEl.classList.remove('visible');
+    },
+  };
+})();
 
 // --- touchstart ---
 wrapper.addEventListener('touchstart', e => {
