@@ -1337,6 +1337,57 @@
       border-color: #fff;
     }
 
+    /* ── Mobile Onboarding Overlay ── */
+    #mobile-onboarding {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.82);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      gap: 28px;
+      color: #fff;
+      font-family: inherit;
+    }
+    #mobile-onboarding.visible { display: flex; }
+    #mobile-onboarding .ob-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      max-width: 320px;
+    }
+    #mobile-onboarding .ob-num {
+      flex: 0 0 auto;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #mobile-onboarding .ob-text {
+      font-size: 15px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.92);
+    }
+    #mobile-onboarding .ob-text strong { color: #fff; }
+    #mobile-onboarding .ob-dismiss {
+      margin-top: 8px;
+      padding: 12px 36px;
+      border: none;
+      border-radius: 12px;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #mobile-onboarding .ob-dismiss:active { opacity: 0.8; }
+
     @media (orientation: landscape) {
       #touch-toolbar button span { display: none; }
       #touch-toolbar button { min-width: 40px; padding: 4px; }
@@ -1725,6 +1776,26 @@
 <div id="mobile-mag-end" class="mobile-mag"><span class="mobile-mag-label">B</span></div>
 <div id="mobile-crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
 <button id="mobile-finish-btn" title="Messung abschließen">✓</button>
+
+<div id="mobile-onboarding">
+  <div class="ob-step">
+    <span class="ob-num">1</span>
+    <span class="ob-text"><strong>Tippen</strong> — setzt einen Punkt mit Fadenkreuz</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">2</span>
+    <span class="ob-text"><strong>Ziehen</strong> — Punkt genau positionieren (Lupe zeigt Detail)</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">3</span>
+    <span class="ob-text"><strong>Loslassen</strong> — Punkt wird bestätigt</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">✓</span>
+    <span class="ob-text">Bei Fläche / Leitung: <strong>✓-Button</strong> drücken zum Abschließen</span>
+  </div>
+  <button class="ob-dismiss" id="mobile-ob-dismiss">Verstanden</button>
+</div>
 
 <div id="mobile-pipe-bar"></div>
 <div id="mobile-helpers-bar"></div>
@@ -2490,6 +2561,10 @@ function updateMeasureButtons() {
 
 function setTool(t) {
   if (MEASURE_TOOLS.includes(t) && !requireScale()) return;
+  // Mobile onboarding: show on first drawing tool selection
+  if (['ref','distance','area','circle','arc','pipe'].includes(t) && typeof _showMobileOnboarding === 'function') {
+    _showMobileOnboarding();
+  }
   state.tool = t;
   cancelDrawing();
   Object.keys(TOOL_NAMES).forEach(id => {
@@ -7970,6 +8045,18 @@ _sidebar.addEventListener('touchend', () => { _drawerTouchY = null; }, { passive
 const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (_isTouchDevice) document.documentElement.classList.add('touch-device');
 const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
+
+// ── Mobile Onboarding ──
+const _MOB_OB_KEY = 'gp_mobile_ob_seen';
+function _showMobileOnboarding() {
+  if (!_isTouchDevice || localStorage.getItem(_MOB_OB_KEY)) return false;
+  document.getElementById('mobile-onboarding').classList.add('visible');
+  return true;
+}
+document.getElementById('mobile-ob-dismiss').onclick = () => {
+  localStorage.setItem(_MOB_OB_KEY, '1');
+  document.getElementById('mobile-onboarding').classList.remove('visible');
+};
 
 // Mobile: Canvas-Größe an die nun größere Fläche anpassen (Header/Toolbar ausgeblendet)
 if (_isTouchDevice) {
