@@ -8076,9 +8076,14 @@ function _updateMobileMagnifiers(p) {
     _mobileMag.updateStart(lastPt.x, lastPt.y, col);
     hasStart = true;
   }
-  if (!hasStart) _mobileMag.hideStart();
-  // Rechte Lupe: aktuelle Fingerposition
-  _mobileMag.updateEnd(p.x, p.y, col);
+  if (hasStart) {
+    // Zweiter Punkt: A zeigt Startpunkt (oben gesetzt), B zeigt Fingerposition
+    _mobileMag.updateEnd(p.x, p.y, col);
+  } else {
+    // Erster Punkt: A zeigt Fingerposition, B ausblenden
+    _mobileMag.updateStart(p.x, p.y, col);
+    _mobileMag.hideEnd();
+  }
 }
 
 if (_isTouchDevice) {
