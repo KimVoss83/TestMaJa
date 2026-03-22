@@ -3318,6 +3318,10 @@ canvas.on('mouse:move', opt => {
   const p = canvas.getPointer(opt.e);
   document.getElementById('status-coords').textContent = `x: ${Math.round(p.x)}, y: ${Math.round(p.y)}`;
 
+  // Auf Touch-Geräten: Preview-Updates nur wenn NICHT im Adjust-Modus
+  // (dort übernimmt der Capture-Touchmove-Handler die Updates, um Doppel-Rendering zu vermeiden)
+  const _skipPreview = typeof _mobileAdjust !== 'undefined' && _mobileAdjust.active;
+  if (!_skipPreview) {
   // Ref line preview
   if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
     state.drawingLine.set({ x2: p.x, y2: p.y });
@@ -3360,6 +3364,7 @@ canvas.on('mouse:move', opt => {
   if (['ref','distance','area','circle','arc','pipe'].includes(state.tool) && !state.pipeRefMode) {
     showPipeDistanceGuides(p);
   }
+  } // end !_skipPreview
   // Ref line preview for all measurement tools + pipe + Maßstab
   if (['ref','distance','area','circle','arc','pipe'].includes(state.tool) && state.pipeRefMode === 'line-2' && state.pipeRefTempPt) {
     canvas.getObjects().filter(o => o._pipeRefTemp && o.type === 'line').forEach(o => canvas.remove(o));
@@ -7837,15 +7842,13 @@ if (_isTouchDevice) {
 // unterdrückt wird. Der Punkt wird erst bei touchend gesetzt.
 // =========================================================
 function _getCanvasPtrFromTouch(touch) {
-  // Fabric.js getPointer braucht clientX/clientY
-  const vpt = canvas.viewportTransform;
-  const rect = canvas.upperCanvasEl.getBoundingClientRect();
-  const offsetX = touch.clientX - rect.left;
-  const offsetY = touch.clientY - rect.top;
-  return {
-    x: (offsetX - vpt[4]) / vpt[0],
-    y: (offsetY - vpt[5]) / vpt[3],
-  };
+  // Fabric.js getPointer verwenden für korrekte DPR/Retina-Berechnung
+  return canvas.getPointer({
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    pageX: touch.pageX,
+    pageY: touch.pageY,
+  });
 }
 
 function _updateMobileMagnifiers(p) {
@@ -7887,7 +7890,11 @@ if (_isTouchDevice) {
     if (e.touches.length !== 1) return;
     if (Date.now() < _pinchCooldownUntil) return;
 
-    // Fabric.js mouse:down unterdrücken
+    // iOS-Standardverhalten verhindern (verhindert auch Fabric.js mouse:down via Maus-Emulation)
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    // Fabric.js mouse:down unterdrücken (falls es trotzdem feuert)
     _touchSuppressClick = true;
     _mobileAdjust.active = true;
 
@@ -7895,14 +7902,18 @@ if (_isTouchDevice) {
     const p = _getCanvasPtrFromTouch(touch);
     _mobileAdjust.lastCanvasPos = p;
 
-    // Crosshair + Magnifier zeigen
+    // Crosshair + Magnifier sofort zeigen
     _showMobileCrosshair(touch.clientX, touch.clientY);
     _updateMobileMagnifiers(p);
-  }, { capture: true });
+  }, { capture: true, passive: false });
 
   // Touchmove: Crosshair + Magnifier updaten, Preview-Linie updaten
   canvas.upperCanvasEl.addEventListener('touchmove', e => {
     if (!_mobileAdjust.active || e.touches.length !== 1) return;
+
+    // Fabric.js darf diesen Move nicht verarbeiten (sonst Doppel-Rendering)
+    e.preventDefault();
+    e.stopImmediatePropagation();
 
     const touch = e.touches[0];
     const p = _getCanvasPtrFromTouch(touch);
@@ -7911,7 +7922,7 @@ if (_isTouchDevice) {
     // Crosshair-Overlay verschieben
     _showMobileCrosshair(touch.clientX, touch.clientY);
 
-    // Preview-Linie manuell updaten (da Fabric mouse:move evtl. nicht feuert)
+    // Preview-Linie manuell updaten
     const snapped = snapToPixel(p);
     if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
       state.drawingLine.set({ x2: snapped.x, y2: snapped.y });
@@ -7949,12 +7960,17 @@ if (_isTouchDevice) {
 
     // Magnifier updaten
     _updateMobileMagnifiers(snapped);
-  }, { passive: true });
+  }, { capture: true, passive: false });
 
   // Touchend: Punkt bestätigen
   canvas.upperCanvasEl.addEventListener('touchend', e => {
     if (!_mobileAdjust.active) return;
+
+    // Fabric.js touchend unterdrücken
+    e.stopImmediatePropagation();
+
     _mobileAdjust.active = false;
+    _touchSuppressClick = false; // Reset für nächsten Touch
     _hideMobileCrosshair();
 
     const touch = e.changedTouches[0];
@@ -7992,7 +8008,7 @@ if (_isTouchDevice) {
     if (toolDone) {
       _mobileMag.hide();
     }
-  }, { passive: true });
+  }, { capture: true });
 }
 
 // --- touchstart (Bubbling: Pinch + Pan) ---
