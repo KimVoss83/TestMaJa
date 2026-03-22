@@ -2559,12 +2559,19 @@ function updateMeasureButtons() {
   });
 }
 
+// Mobile onboarding trigger (defined here so it's available when setTool runs)
+const _MOB_OB_TOOLS = ['ref','distance','area','circle','arc','pipe'];
+function _tryMobileOnboarding(t) {
+  if (!_MOB_OB_TOOLS.includes(t)) return;
+  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  if (!isMobile || localStorage.getItem('gp_mobile_ob_seen')) return;
+  const el = document.getElementById('mobile-onboarding');
+  if (el) el.classList.add('visible');
+}
+
 function setTool(t) {
   if (MEASURE_TOOLS.includes(t) && !requireScale()) return;
-  // Mobile onboarding: show on first drawing tool selection
-  if (['ref','distance','area','circle','arc','pipe'].includes(t) && typeof _showMobileOnboarding === 'function') {
-    _showMobileOnboarding();
-  }
+  _tryMobileOnboarding(t);
   state.tool = t;
   cancelDrawing();
   Object.keys(TOOL_NAMES).forEach(id => {
@@ -8046,15 +8053,9 @@ const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (_isTouchDevice) document.documentElement.classList.add('touch-device');
 const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
 
-// ── Mobile Onboarding ──
-const _MOB_OB_KEY = 'gp_mobile_ob_seen';
-function _showMobileOnboarding() {
-  if (!_isTouchDevice || localStorage.getItem(_MOB_OB_KEY)) return false;
-  document.getElementById('mobile-onboarding').classList.add('visible');
-  return true;
-}
+// ── Mobile Onboarding dismiss ──
 document.getElementById('mobile-ob-dismiss').onclick = () => {
-  localStorage.setItem(_MOB_OB_KEY, '1');
+  localStorage.setItem('gp_mobile_ob_seen', '1');
   document.getElementById('mobile-onboarding').classList.remove('visible');
 };
 
