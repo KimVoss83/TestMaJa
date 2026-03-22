@@ -1169,6 +1169,63 @@
     #mobile-mag-end { right: 12px; }
     html.touch-device .mobile-mag.visible { display: block; }
 
+    /* ── Mobile Crosshair Overlay ── */
+    #mobile-crosshair {
+      display: none;
+      position: fixed;
+      width: 120px; height: 120px;
+      pointer-events: none;
+      z-index: 500;
+      transform: translate(-50%, -50%);
+    }
+    #mobile-crosshair.visible { display: block; }
+    #mobile-crosshair .ch-h,
+    #mobile-crosshair .ch-v {
+      position: absolute;
+      background: rgba(210,30,30,0.75);
+    }
+    #mobile-crosshair .ch-h {
+      left: 0; right: 0; top: 50%;
+      height: 1.5px;
+      transform: translateY(-0.75px);
+    }
+    #mobile-crosshair .ch-v {
+      top: 0; bottom: 0; left: 50%;
+      width: 1.5px;
+      transform: translateX(-0.75px);
+    }
+    #mobile-crosshair .ch-dot {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 10px; height: 10px;
+      border: 1.5px solid rgba(210,30,30,0.9);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.5);
+    }
+
+    /* ── Mobile Finish Button ── */
+    #mobile-finish-btn {
+      display: none;
+      position: fixed;
+      bottom: 74px; right: 16px;
+      z-index: 495;
+      min-width: 56px; min-height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 24px;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(123,47,190,0.4);
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    html.touch-device #mobile-finish-btn.visible { display: flex; }
+
     /* ── Mobile Bottom Toolbar ── */
     #touch-toolbar {
       display: none;
@@ -1501,6 +1558,8 @@
 
 <div id="mobile-mag-start" class="mobile-mag"><span class="mobile-mag-label">Anfang</span></div>
 <div id="mobile-mag-end" class="mobile-mag"><span class="mobile-mag-label">Ende</span></div>
+<div id="mobile-crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
+<button id="mobile-finish-btn" title="Messung abschließen">✓</button>
 
 <div id="touch-toolbar">
   <button id="tt-select" title="Auswahl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Auswahl</span></button>
@@ -3319,47 +3378,10 @@ canvas.on('mouse:move', opt => {
   if (_loupeActive) { _loupe.show(); _loupe.update(opt.e.clientX, opt.e.clientY, opt.e.offsetX, opt.e.offsetY); }
   else              { _loupe.hide(); }
 
-  // Mobile Magnifiers: Anfang (links) + Ende/Cursor (rechts)
-  if (_isTouchDevice && _loupeActive) {
-    const col = state.color || 'rgba(210,30,30,0.92)';
-    // Startpunkt-Lupe (links): zeigt den bereits gesetzten Anfangspunkt
-    let hasStart = false;
-    if (state.tool === 'ref' && state.refPoints.length === 1) {
-      _mobileMag.updateStart(state.refPoints[0].x, state.refPoints[0].y, '#cc0000');
-      hasStart = true;
-    } else if (state.tool === 'distance' && state.distPoints.length === 1) {
-      _mobileMag.updateStart(state.distPoints[0].x, state.distPoints[0].y, col);
-      hasStart = true;
-    } else if (state.tool === 'circle' && state.circleCenter) {
-      _mobileMag.updateStart(state.circleCenter.x, state.circleCenter.y, col);
-      hasStart = true;
-    } else if (state.tool === 'arc' && state.arcStep >= 1 && state.arcCenter) {
-      _mobileMag.updateStart(state.arcCenter.x, state.arcCenter.y, col);
-      hasStart = true;
-    } else if (state.tool === 'area' && state.areaPoints.length >= 1) {
-      const lastPt = state.areaPoints[state.areaPoints.length - 1];
-      _mobileMag.updateStart(lastPt.x, lastPt.y, col);
-      hasStart = true;
-    } else if (state.tool === 'pipe' && state.pipePoints.length >= 1) {
-      const lastPt = state.pipePoints[state.pipePoints.length - 1];
-      _mobileMag.updateStart(lastPt.x, lastPt.y, col);
-      hasStart = true;
-    }
-    if (!hasStart) { _mobileMag.hideStart(); }
-
-    // Endpunkt/Cursor-Lupe (rechts): zeigt die aktuelle Fingerposition
-    if (hasStart || state.tool !== 'select') {
-      _mobileMag.updateEnd(p.x, p.y, col);
-    }
-    if (!hasStart && state.tool !== 'select') {
-      _mobileMag.hideStart();
-    }
-  } else if (_isTouchDevice) {
-    _mobileMag.hide();
-  }
+  // Mobile Magnifiers werden jetzt über die Touch-Capture-Handlers gesteuert
 });
 
-canvas.on('mouse:out', () => { _loupe.hide(); if (_isTouchDevice) _mobileMag.hide(); });
+canvas.on('mouse:out', () => { _loupe.hide(); });
 
 // Snap-to-Pixel: Rastet Koordinaten auf das nächste Original-Bildpixel ein,
 // damit Messungen wiederholbar und konsistent sind.
@@ -7665,22 +7687,28 @@ wrapper.addEventListener('touchmove', e => {
 }, { passive: false });
 
 // =========================================================
-// TOUCH: EINFACHE STATE-MACHINE
-// Fabric.js verarbeitet Taps nativ (mouse:down/up/move).
-// Wir fügen nur hinzu: Pinch-Zoom, Post-Pinch-Cooldown,
-// Ein-Finger-Pan im Select-Modus, Doppeltipp.
+// TOUCH: STATE-MACHINE MIT PUNKT-JUSTIERUNG
+// Auf Mobilgeräten: Punkt wird beim Aufsetzen des Fingers
+// vorläufig platziert, kann verschoben werden, und wird
+// erst beim Anheben bestätigt.
 // =========================================================
 let _touchState = { type: null, lastDist: 0, lastMid: null, startTime: 0 };
 const _PINCH_COOLDOWN_MS = 350;
 let _pinchCooldownUntil = 0;
 let _lastTapTime = 0;
 const _DOUBLE_TAP_MS = 400;
-// Flag: wenn true, unterdrückt canvas.on('mouse:down') den nächsten Event
 let _touchSuppressClick = false;
 
-// Lupe auf Touch-Geräten deaktivieren (zu viel Platz auf kleinem Bildschirm)
+// Mobile Adjust State: Track touch-adjust mode for drawing tools
+let _mobileAdjust = {
+  active: false,       // currently adjusting a point
+  lastCanvasPos: null, // last known canvas-coordinate position
+};
+const _crosshairEl = document.getElementById('mobile-crosshair');
+const _finishBtn = document.getElementById('mobile-finish-btn');
+
+// Lupe auf Touch-Geräten deaktivieren (Desktop-Lupe nicht nötig)
 if (_isTouchDevice) {
-  const _origLoupeShow = _loupe.show;
   _loupe.show = function() { /* noop auf Touch */ };
 }
 
@@ -7714,40 +7742,29 @@ const _mobileMag = (() => {
     const ctx = mag.ctx;
     const c = mag.canvas;
 
-    // Resize if needed
     if (c.width !== SIZE * d) {
-      c.width = SIZE * d;
-      c.height = SIZE * d;
-      c.style.width = SIZE + 'px';
-      c.style.height = SIZE + 'px';
+      c.width = SIZE * d; c.height = SIZE * d;
+      c.style.width = SIZE + 'px'; c.style.height = SIZE + 'px';
     }
 
-    // Convert canvas coordinates to pixel position on lowerCanvasEl
     const vpt = canvas.viewportTransform;
     const screenX = canvasX * vpt[0] + vpt[4];
     const screenY = canvasY * vpt[3] + vpt[5];
-    const cpx = screenX * d;
-    const cpy = screenY * d;
+    const cpx = screenX * d, cpy = screenY * d;
 
-    const srcW = (SIZE / ZOOM) * d;
-    const srcH = (SIZE / ZOOM) * d;
-    const srcX = cpx - srcW / 2;
-    const srcY = cpy - srcH / 2;
+    const srcW = (SIZE / ZOOM) * d, srcH = (SIZE / ZOOM) * d;
+    const srcX = cpx - srcW / 2, srcY = cpy - srcH / 2;
 
     ctx.clearRect(0, 0, SIZE * d, SIZE * d);
     try { ctx.drawImage(canvas.lowerCanvasEl, srcX, srcY, srcW, srcH, 0, 0, SIZE * d, SIZE * d); } catch(_) {}
 
-    // Crosshair
     ctx.save();
     ctx.scale(d, d);
-    const h = SIZE / 2;
-    const GAP = 6;
+    const h = SIZE / 2, GAP = 6;
 
-    // White halo
     ctx.fillStyle = 'rgba(255,255,255,0.82)';
     ctx.beginPath(); ctx.arc(h, h, GAP + 1, 0, Math.PI * 2); ctx.fill();
 
-    // Dashed crosshair
     ctx.strokeStyle = color || 'rgba(210,30,30,0.92)';
     ctx.lineWidth = 1.2;
     ctx.setLineDash([5, 3]);
@@ -7756,7 +7773,6 @@ const _mobileMag = (() => {
     ctx.beginPath(); ctx.moveTo(h, 0); ctx.lineTo(h, h - GAP); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(h, h + GAP); ctx.lineTo(h, SIZE); ctx.stroke();
 
-    // Center dot
     ctx.setLineDash([]);
     ctx.strokeStyle = color || 'rgba(210,30,30,1)';
     ctx.lineWidth = 1.5;
@@ -7765,37 +7781,228 @@ const _mobileMag = (() => {
   }
 
   let _active = false;
-
   return {
     get active() { return _active; },
-    updateStart(canvasX, canvasY, color) {
-      startEl.classList.add('visible');
-      _active = true;
-      renderMag(startMag, canvasX, canvasY, color);
-    },
-    updateEnd(canvasX, canvasY, color) {
-      endEl.classList.add('visible');
-      _active = true;
-      renderMag(endMag, canvasX, canvasY, color);
-    },
+    updateStart(canvasX, canvasY, color) { startEl.classList.add('visible'); _active = true; renderMag(startMag, canvasX, canvasY, color); },
+    updateEnd(canvasX, canvasY, color) { endEl.classList.add('visible'); _active = true; renderMag(endMag, canvasX, canvasY, color); },
     hideStart() { startEl.classList.remove('visible'); },
     hideEnd() { endEl.classList.remove('visible'); },
     show() { _active = true; },
-    hide() {
-      _active = false;
-      startEl.classList.remove('visible');
-      endEl.classList.remove('visible');
-    },
+    hide() { _active = false; startEl.classList.remove('visible'); endEl.classList.remove('visible'); },
   };
 })();
 
-// --- touchstart ---
+// =========================================================
+// MOBILE CROSSHAIR: Positionierung + Sichtbarkeit
+// =========================================================
+function _showMobileCrosshair(clientX, clientY) {
+  _crosshairEl.style.left = clientX + 'px';
+  _crosshairEl.style.top = clientY + 'px';
+  _crosshairEl.classList.add('visible');
+}
+function _hideMobileCrosshair() {
+  _crosshairEl.classList.remove('visible');
+}
+
+// =========================================================
+// MOBILE FINISH BUTTON: für Fläche/Leitung (Multi-Punkt)
+// =========================================================
+function _updateFinishBtn() {
+  if (!_isTouchDevice) return;
+  const showFinish =
+    (state.tool === 'area' && state.areaPoints.length >= 3) ||
+    (state.tool === 'pipe' && state.pipePoints.length >= 2);
+  if (showFinish) {
+    _finishBtn.classList.add('visible');
+  } else {
+    _finishBtn.classList.remove('visible');
+  }
+}
+if (_isTouchDevice) {
+  _finishBtn.addEventListener('click', () => {
+    if (state.tool === 'area' && state.areaPoints.length >= 3) {
+      finishArea();
+    } else if (state.tool === 'pipe' && state.pipePoints.length >= 2) {
+      finishPipe();
+    }
+    _finishBtn.classList.remove('visible');
+    _mobileMag.hide();
+    _hideMobileCrosshair();
+  });
+}
+
+// =========================================================
+// MOBILE: Punkt-Justierung via Capture-Phase
+// Fängt touchstart VOR Fabric.js ab, damit mouse:down
+// unterdrückt wird. Der Punkt wird erst bei touchend gesetzt.
+// =========================================================
+function _getCanvasPtrFromTouch(touch) {
+  // Fabric.js getPointer braucht clientX/clientY
+  const vpt = canvas.viewportTransform;
+  const rect = canvas.upperCanvasEl.getBoundingClientRect();
+  const offsetX = touch.clientX - rect.left;
+  const offsetY = touch.clientY - rect.top;
+  return {
+    x: (offsetX - vpt[4]) / vpt[0],
+    y: (offsetY - vpt[5]) / vpt[3],
+  };
+}
+
+function _updateMobileMagnifiers(p) {
+  const col = state.color || 'rgba(210,30,30,0.92)';
+  let hasStart = false;
+  if (state.tool === 'ref' && state.refPoints.length === 1) {
+    _mobileMag.updateStart(state.refPoints[0].x, state.refPoints[0].y, '#cc0000');
+    hasStart = true;
+  } else if (state.tool === 'distance' && state.distPoints.length === 1) {
+    _mobileMag.updateStart(state.distPoints[0].x, state.distPoints[0].y, col);
+    hasStart = true;
+  } else if (state.tool === 'circle' && state.circleCenter) {
+    _mobileMag.updateStart(state.circleCenter.x, state.circleCenter.y, col);
+    hasStart = true;
+  } else if (state.tool === 'arc' && state.arcStep >= 1 && state.arcCenter) {
+    _mobileMag.updateStart(state.arcCenter.x, state.arcCenter.y, col);
+    hasStart = true;
+  } else if (state.tool === 'area' && state.areaPoints.length >= 1) {
+    const lastPt = state.areaPoints[state.areaPoints.length - 1];
+    _mobileMag.updateStart(lastPt.x, lastPt.y, col);
+    hasStart = true;
+  } else if (state.tool === 'pipe' && state.pipePoints.length >= 1) {
+    const lastPt = state.pipePoints[state.pipePoints.length - 1];
+    _mobileMag.updateStart(lastPt.x, lastPt.y, col);
+    hasStart = true;
+  }
+  if (!hasStart) _mobileMag.hideStart();
+  // Rechte Lupe: aktuelle Fingerposition
+  _mobileMag.updateEnd(p.x, p.y, col);
+}
+
+if (_isTouchDevice) {
+  const DRAWING_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
+
+  // Capture-Phase: fängt Touch VOR Fabric.js ab
+  canvas.upperCanvasEl.addEventListener('touchstart', e => {
+    if (!DRAWING_TOOLS.includes(state.tool)) return;
+    if (!state.backgroundImage) return;
+    if (e.touches.length !== 1) return;
+    if (Date.now() < _pinchCooldownUntil) return;
+
+    // Fabric.js mouse:down unterdrücken
+    _touchSuppressClick = true;
+    _mobileAdjust.active = true;
+
+    const touch = e.touches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    _mobileAdjust.lastCanvasPos = p;
+
+    // Crosshair + Magnifier zeigen
+    _showMobileCrosshair(touch.clientX, touch.clientY);
+    _updateMobileMagnifiers(p);
+  }, { capture: true });
+
+  // Touchmove: Crosshair + Magnifier updaten, Preview-Linie updaten
+  canvas.upperCanvasEl.addEventListener('touchmove', e => {
+    if (!_mobileAdjust.active || e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    _mobileAdjust.lastCanvasPos = p;
+
+    // Crosshair-Overlay verschieben
+    _showMobileCrosshair(touch.clientX, touch.clientY);
+
+    // Preview-Linie manuell updaten (da Fabric mouse:move evtl. nicht feuert)
+    const snapped = snapToPixel(p);
+    if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
+      state.drawingLine.set({ x2: snapped.x, y2: snapped.y });
+      throttledRender();
+    }
+    if (state.tool === 'distance' && state.distPoints.length === 1 && state.drawingLine) {
+      state.drawingLine.set({ x2: snapped.x, y2: snapped.y });
+      const p1 = state.distPoints[0];
+      const pxDist = ptDist(p1.x, p1.y, snapped.x, snapped.y) / state.imgDisplayScale;
+      const meters = state.scale ? pxDist / state.scale : null;
+      const liveText = meters ? formatDistance(meters) : `${Math.round(pxDist)} px`;
+      updateLiveLabel(p1, snapped, liveText);
+      throttledRender();
+    }
+    if (state.tool === 'area' && state.areaPoints.length > 0) {
+      updatePreviewPolygon([...state.areaPoints, snapped]);
+    }
+    if (state.tool === 'circle' && state.circleCenter) {
+      const r = Math.hypot(snapped.x - state.circleCenter.x, snapped.y - state.circleCenter.y);
+      updatePreviewCircle(state.circleCenter, r, snapped);
+      const rOrig = r / state.imgDisplayScale;
+      const rMeters = state.scale ? rOrig / state.scale : null;
+      const liveText = rMeters ? `r = ${formatDistance(rMeters)}` : `r = ${Math.round(r)} px`;
+      updateLiveLabel(state.circleCenter, snapped, liveText);
+    }
+    if (state.tool === 'arc' && state.arcStep >= 1) {
+      updatePreviewArc(snapped);
+    }
+    if (state.tool === 'pipe' && state.pipePoints.length > 0) {
+      updatePreviewPipe([...state.pipePoints, snapped]);
+    }
+    if (DRAWING_TOOLS.includes(state.tool) && !state.pipeRefMode) {
+      showPipeDistanceGuides(snapped);
+    }
+
+    // Magnifier updaten
+    _updateMobileMagnifiers(snapped);
+  }, { passive: true });
+
+  // Touchend: Punkt bestätigen
+  canvas.upperCanvasEl.addEventListener('touchend', e => {
+    if (!_mobileAdjust.active) return;
+    _mobileAdjust.active = false;
+    _hideMobileCrosshair();
+
+    const touch = e.changedTouches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    const snapped = snapToPixel(p);
+
+    // Punkt an Tool-Handler übergeben
+    // Prüfe zuerst Referenz-Erstellung
+    if (DRAWING_TOOLS.includes(state.tool) && handlePipeRefClick(snapped)) {
+      _mobileMag.hide();
+      return;
+    }
+
+    switch (state.tool) {
+      case 'ref':      handleRefClick(snapped); break;
+      case 'distance': handleDistanceClick(snapped); break;
+      case 'area':     handleAreaClick(snapped); break;
+      case 'circle':   handleCircleClick(snapped); break;
+      case 'arc':      handleArcClick(snapped); break;
+      case 'pipe':     handlePipeClick(snapped); break;
+    }
+
+    // Finish-Button für Multi-Punkt-Tools aktualisieren
+    _updateFinishBtn();
+
+    // Magnifier aktualisieren: Start-Lupe zeigt den gerade gesetzten Punkt
+    _updateMobileMagnifiers(snapped);
+
+    // Wenn Messung abgeschlossen (Tool-State zurückgesetzt), Lupen ausblenden
+    const toolDone =
+      (state.tool === 'ref' && state.refPoints.length === 0) ||
+      (state.tool === 'distance' && state.distPoints.length === 0) ||
+      (state.tool === 'circle' && !state.circleCenter) ||
+      (state.tool === 'arc' && state.arcStep === 0);
+    if (toolDone) {
+      _mobileMag.hide();
+    }
+  }, { passive: true });
+}
+
+// --- touchstart (Bubbling: Pinch + Pan) ---
 wrapper.addEventListener('touchstart', e => {
   if (_touchOnOverlay(e)) return;
 
   if (e.touches.length === 2) {
     e.preventDefault();
     _touchSuppressClick = true;
+    if (_mobileAdjust.active) { _mobileAdjust.active = false; _hideMobileCrosshair(); }
     _touchState.type = 'pinch';
     _touchState.lastDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -7809,24 +8016,18 @@ wrapper.addEventListener('touchstart', e => {
   }
 
   if (e.touches.length === 1) {
-    // Post-Pinch Cooldown
     if (Date.now() < _pinchCooldownUntil) {
       _touchSuppressClick = true;
       _touchState.type = 'cooldown';
       return;
     }
-
     _touchState.type = 'single';
     _touchState.startTime = Date.now();
     _touchState.lastMid = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-
-    // Im Select-Modus: Fabric.js verarbeitet nativ (Objekt-Auswahl etc.)
-    // In Drawing-Modi: Fabric.js verarbeitet nativ (Preview-Linien + mouse:down)
-    // → Kein preventDefault, kein eigenes Handling nötig
   }
 }, { passive: false });
 
-// --- touchmove ---
+// --- touchmove (Pinch + Pan) ---
 wrapper.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && _touchState.type === 'pinch') {
     e.preventDefault();
@@ -7856,7 +8057,6 @@ wrapper.addEventListener('touchmove', e => {
   }
 
   if (e.touches.length === 1 && _touchState.type === 'single' && state.tool === 'select') {
-    // Ein-Finger-Pan im Auswahl-Modus (wie vorher)
     e.preventDefault();
     const t = e.touches[0];
     if (_touchState.lastMid) {
@@ -7871,26 +8071,13 @@ wrapper.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 
-// --- touchend ---
+// --- touchend (Pinch-Cooldown) ---
 wrapper.addEventListener('touchend', e => {
   if (e.touches.length === 0) {
     if (_touchState.type === 'pinch') {
       _pinchCooldownUntil = Date.now() + _PINCH_COOLDOWN_MS;
       _touchSuppressClick = true;
     }
-
-    // Doppeltipp-Erkennung für Area/Pipe-Abschluss
-    if (_touchState.type === 'single' && !_touchSuppressClick) {
-      const now = Date.now();
-      if (now - _lastTapTime < _DOUBLE_TAP_MS) {
-        if (state.tool === 'area' && state.areaPoints.length >= 3) { finishArea(); _touchSuppressClick = true; }
-        else if (state.tool === 'pipe' && state.pipePoints.length >= 2) { finishPipe(); _touchSuppressClick = true; }
-        _lastTapTime = 0;
-      } else {
-        _lastTapTime = now;
-      }
-    }
-
     _touchState.type = null;
     _touchState.lastMid = null;
   }
