@@ -6793,8 +6793,29 @@ document.getElementById('btn-central-load').onclick = openLoadModal;
 function doSavePNG() {
   endPipeEdit(); clearPipeDistanceGuides();
   const url = canvas.toDataURL({ format: 'png', multiplier: 3 });
+
+  // Data-URL → Blob konvertieren
+  const byteString = atob(url.split(',')[1]);
+  const mimeString = url.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  const blob = new Blob([ab], { type: mimeString });
+  const file = new File([blob], 'gartenplan.png', { type: 'image/png' });
+
+  // iOS/Mobile: Share Sheet verwenden wenn verfügbar
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Gartenplan' }).catch(() => {});
+    return;
+  }
+
+  // Fallback: Blob-URL Download (funktioniert besser als data: URL)
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'gartenplan.png'; a.click();
+  a.href = blobUrl;
+  a.download = 'gartenplan.png';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 }
 
 document.getElementById('btn-save-png').onclick = doSavePNG;
@@ -6912,7 +6933,14 @@ function doSavePDF() {
     }
   }
 
-  pdf.save('gartenplan.pdf');
+  // iOS/Mobile: Share Sheet wenn verfügbar
+  const pdfBlob = pdf.output('blob');
+  const pdfFile = new File([pdfBlob], 'gartenplan.pdf', { type: 'application/pdf' });
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    navigator.share({ files: [pdfFile], title: 'Gartenplan' }).catch(() => {});
+  } else {
+    pdf.save('gartenplan.pdf');
+  }
 
   btn.textContent = 'PDF exportieren';
   btn.disabled = false;
@@ -6943,8 +6971,15 @@ function doSaveProjectJSON() {
     canvas: canvas.toJSON(['_measureId','_isRef','_noSelect','_circlePreview','_arcPreview','_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset','_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib']),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const file = new File([blob], 'gartenplan.json', { type: 'application/json' });
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Gartenplan' }).catch(() => {});
+    return;
+  }
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'gartenplan.json'; a.click();
+  a.href = blobUrl; a.download = 'gartenplan.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 }
 document.getElementById('btn-save-json').onclick = doSaveProjectJSON;
 
