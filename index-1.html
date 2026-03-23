@@ -7175,6 +7175,11 @@ document.getElementById('json-input').onchange = e => {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
+      // Auto-detect Feldaufnahme files and redirect to import
+      if (data.type === 'feldaufnahme' || data.type === 'feldaufnahme-project') {
+        importFeldaufnahme(data);
+        return;
+      }
       if (typeof data !== 'object' || !data.canvas) throw new Error('Ungültiges Format');
       state.scale           = (typeof data.scale === 'number' && data.scale > 0) ? data.scale : null;
       state.scaleSource     = data.scaleSource || null;
@@ -7230,7 +7235,8 @@ function importFeldaufnahme(data) {
     showToast('Bitte zuerst ein Hintergrundbild laden.', 'error');
     return;
   }
-  if (data.type !== 'feldaufnahme' || !Array.isArray(data.elements)) {
+  // Accept both export format (type: 'feldaufnahme') and project format (type: 'feldaufnahme-project')
+  if ((data.type !== 'feldaufnahme' && data.type !== 'feldaufnahme-project') || !Array.isArray(data.elements)) {
     showToast('Ungültiges Feldaufnahme-Format.', 'error');
     return;
   }
@@ -7239,9 +7245,21 @@ function importFeldaufnahme(data) {
   const s = state.imgDisplayScale;
   const offX = bg.left;
   const offY = bg.top;
+  const isProject = data.type === 'feldaufnahme-project';
 
-  // Map original-pixel coords → canvas coords
-  const toCanvas = (x, y) => ({ x: x * s + offX, y: y * s + offY });
+  // Export format: coords are original image pixels → map to planer canvas
+  // Project format: coords are feldaufnahme canvas coords → subtract src bg offset, divide by src scale → image pixels
+  const srcScale = isProject ? (data.imgDisplayScale || 1) : 1;
+  const srcBgLeft = isProject ? (data.bgLeft || 0) : 0;
+  const srcBgTop = isProject ? (data.bgTop || 0) : 0;
+  const toCanvas = (x, y) => {
+    let imgX = x, imgY = y;
+    if (isProject) {
+      imgX = (x - srcBgLeft) / srcScale;
+      imgY = (y - srcBgTop) / srcScale;
+    }
+    return { x: imgX * s + offX, y: imgY * s + offY };
+  };
 
   const importedObjects = [];
   const idMap = {}; // feldaufnahme elementId → label (for measurement display)
@@ -7394,7 +7412,7 @@ document.getElementById('feldaufnahme-import-input').onchange = e => {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
-      if (data.type === 'feldaufnahme') {
+      if (data.type === 'feldaufnahme' || data.type === 'feldaufnahme-project') {
         importFeldaufnahme(data);
       } else {
         showToast('Keine gültige Feldaufnahme-Datei.', 'error');

@@ -1777,6 +1777,8 @@ function saveProject() {
     saveDate: new Date().toISOString(),
     backgroundInfo: state.backgroundInfo,
     imgDisplayScale: state.imgDisplayScale,
+    bgLeft: state.backgroundImage ? state.backgroundImage.left : 0,
+    bgTop: state.backgroundImage ? state.backgroundImage.top : 0,
     canvas: json,
     elements: elements,
     measurements: measurements,
