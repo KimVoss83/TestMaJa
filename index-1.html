@@ -2596,10 +2596,10 @@ function setTool(t) {
   if (t === 'select') _loupe.hide();
   if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
   canvas.forEachObject(o => {
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && !!o._feldaufnahmeImport && !o._faMeasurement);
+    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && o._faType === 'area') || (t === 'select' && o._faType === 'area-label');
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, feldaufnahme imports
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || (!!o._feldaufnahmeImport && !o._faMeasurement);
+    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, imported areas
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || o._faType === 'area' || o._faType === 'area-label';
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
@@ -7235,7 +7235,6 @@ function importFeldaufnahme(data) {
     showToast('Bitte zuerst ein Hintergrundbild laden.', 'error');
     return;
   }
-  // Accept both export format (type: 'feldaufnahme') and project format (type: 'feldaufnahme-project')
   if ((data.type !== 'feldaufnahme' && data.type !== 'feldaufnahme-project') || !Array.isArray(data.elements)) {
     showToast('Ungültiges Feldaufnahme-Format.', 'error');
     return;
@@ -7246,12 +7245,10 @@ function importFeldaufnahme(data) {
   const offX = bg.left;
   const offY = bg.top;
   const isProject = data.type === 'feldaufnahme-project';
-
-  // Export format: coords are original image pixels → map to planer canvas
-  // Project format: coords are feldaufnahme canvas coords → subtract src bg offset, divide by src scale → image pixels
   const srcScale = isProject ? (data.imgDisplayScale || 1) : 1;
   const srcBgLeft = isProject ? (data.bgLeft || 0) : 0;
   const srcBgTop = isProject ? (data.bgTop || 0) : 0;
+
   const toCanvas = (x, y) => {
     let imgX = x, imgY = y;
     if (isProject) {
@@ -7261,97 +7258,58 @@ function importFeldaufnahme(data) {
     return { x: imgX * s + offX, y: imgY * s + offY };
   };
 
-  const importedObjects = [];
-  const idMap = {}; // feldaufnahme elementId → label (for measurement display)
+  let nPoints = 0, nLines = 0, nAreas = 0;
+  const idMap = {}; // feldaufnahme elementId → { label, pipeRefId } for measurement annotation
 
-  const markerRadius = 6;
-  const labelFontSize = state.fontSize || 13;
-  const strokeColor = '#e74c3c';
-  const fillColor = 'rgba(231, 76, 60, 0.15)';
-
-  // Import elements
+  // Import elements as native Planer objects
   (data.elements || []).forEach(el => {
-    idMap[el.id] = el.label || ('Element ' + el.id);
+    const label = el.label || ('Element ' + el.id);
 
     if (el.type === 'point' && el.position) {
       const p = toCanvas(el.position.x, el.position.y);
-      const circle = new fabric.Circle({
-        left: p.x - markerRadius, top: p.y - markerRadius,
-        radius: markerRadius, fill: strokeColor, opacity: 0.85,
-        originX: 'left', originY: 'top',
-        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'point',
-      });
-      const label = new fabric.Text(el.label || '', {
-        left: p.x + markerRadius + 4, top: p.y - labelFontSize / 2,
-        fontSize: labelFontSize, fill: '#fff',
-        fontFamily: 'DM Sans, sans-serif',
-        shadow: '1px 1px 2px rgba(0,0,0,0.7)',
-        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'point-label',
-      });
-      canvas.add(circle, label);
-      importedObjects.push(circle, label);
+      createPipeRefPoint(p, label);
+      idMap[el.id] = { label, pipeRefId: pipeRefId, type: 'point' };
+      nPoints++;
 
     } else if (el.type === 'line' && Array.isArray(el.points) && el.points.length >= 2) {
       const pts = el.points.map(p => toCanvas(p.x, p.y));
-      const flatPts = pts.flatMap(p => [p.x, p.y]);
-      const line = new fabric.Polyline(pts.map(p => ({x: p.x, y: p.y})), {
-        fill: 'transparent', stroke: strokeColor, strokeWidth: 2.5, opacity: 0.85,
-        selectable: true, objectCaching: false,
-        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line',
-      });
-      // Label at midpoint
-      const mid = pts[Math.floor(pts.length / 2)];
-      const label = new fabric.Text(el.label || '', {
-        left: mid.x + 6, top: mid.y - labelFontSize / 2,
-        fontSize: labelFontSize, fill: '#fff',
-        fontFamily: 'DM Sans, sans-serif',
-        shadow: '1px 1px 2px rgba(0,0,0,0.7)',
-        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line-label',
-      });
-      canvas.add(line, label);
-      importedObjects.push(line, label);
-      // Endpoint dots
-      pts.forEach(p => {
-        const dot = new fabric.Circle({
-          left: p.x - 3, top: p.y - 3, radius: 3,
-          fill: strokeColor, opacity: 0.7,
-          selectable: false, evented: false,
-          _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line-dot',
-        });
-        canvas.add(dot);
-        importedObjects.push(dot);
-      });
+      // Hilfslinie uses first and last point
+      const p1 = pts[0];
+      const p2 = pts[pts.length - 1];
+      createPipeRefLine(p1, p2, label);
+      idMap[el.id] = { label, pipeRefId: pipeRefId, type: 'line' };
+      nLines++;
 
     } else if (el.type === 'area' && Array.isArray(el.points) && el.points.length >= 3) {
+      // No native area type in Planer — render as annotation polygon
       const pts = el.points.map(p => toCanvas(p.x, p.y));
-      const polygon = new fabric.Polygon(pts.map(p => ({x: p.x, y: p.y})), {
-        fill: fillColor, stroke: strokeColor, strokeWidth: 2, opacity: 0.85,
+      const polygon = new fabric.Polygon(pts, {
+        fill: 'rgba(231, 76, 60, 0.15)', stroke: '#e74c3c', strokeWidth: 2, opacity: 0.85,
         selectable: true, objectCaching: false,
         _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'area',
       });
-      // Label at centroid
-      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-      const label = new fabric.Text(el.label || '', {
-        left: cx, top: cy - labelFontSize / 2,
-        fontSize: labelFontSize, fill: '#fff',
+      const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+      const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+      const txt = new fabric.Text(label, {
+        left: cx, top: cy,
+        fontSize: state.fontSize || 13, fill: '#fff',
         fontFamily: 'DM Sans, sans-serif',
         shadow: '1px 1px 2px rgba(0,0,0,0.7)',
-        originX: 'center',
+        originX: 'center', originY: 'center',
         _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'area-label',
       });
-      canvas.add(polygon, label);
-      importedObjects.push(polygon, label);
+      canvas.add(polygon, txt);
+      nAreas++;
     }
   });
 
-  // Import measurements as annotation lines + value labels
+  // Import measurements as info annotations between elements
+  let nM = 0;
   (data.measurements || []).forEach(m => {
     const elA = (data.elements || []).find(e => e.id === m.fromId);
     const elB = (data.elements || []).find(e => e.id === m.toId);
     if (!elA || !elB) return;
 
-    // Get center point of each element
     const centerOf = el => {
       if (el.type === 'point' && el.position) return toCanvas(el.position.x, el.position.y);
       if (el.type === 'line' && el.points && el.points.length >= 2) {
@@ -7359,8 +7317,8 @@ function importFeldaufnahme(data) {
         return toCanvas(mid.x, mid.y);
       }
       if (el.type === 'area' && el.points && el.points.length >= 3) {
-        const cx = el.points.reduce((s, p) => s + p.x, 0) / el.points.length;
-        const cy = el.points.reduce((s, p) => s + p.y, 0) / el.points.length;
+        const cx = el.points.reduce((sum, p) => sum + p.x, 0) / el.points.length;
+        const cy = el.points.reduce((sum, p) => sum + p.y, 0) / el.points.length;
         return toCanvas(cx, cy);
       }
       return null;
@@ -7370,18 +7328,16 @@ function importFeldaufnahme(data) {
     const pB = centerOf(elB);
     if (!pA || !pB) return;
 
-    // Dashed measurement line
-    const dashLine = new fabric.Line([pA.x, pA.y, pB.x, pB.y], {
-      stroke: '#888', strokeWidth: 1.5, strokeDashArray: [6, 4],
-      selectable: false, evented: false, opacity: 0.8,
-      _feldaufnahmeImport: true, _faMeasurement: true,
-    });
-
-    // Value label at midpoint
     const valueStr = (typeof m.value_m === 'number')
       ? m.value_m.toFixed(2).replace('.', ',') + ' m'
       : '? m';
     const typeStr = m.type === 'perpendicular' ? ' ⊥' : '';
+
+    const dashLine = new fabric.Line([pA.x, pA.y, pB.x, pB.y], {
+      stroke: '#888', strokeWidth: 1.5, strokeDashArray: [6, 4],
+      selectable: false, evented: false, opacity: 0.8,
+      _feldaufnahmeImport: true, _faMeasurement: true, _noSelect: true,
+    });
     const mx = (pA.x + pB.x) / 2;
     const my = (pA.y + pB.y) / 2;
     const valueLabel = new fabric.Text(valueStr + typeStr, {
@@ -7391,19 +7347,22 @@ function importFeldaufnahme(data) {
       backgroundColor: 'rgba(0,0,0,0.6)',
       padding: 3, originX: 'center',
       selectable: false, evented: false,
-      _feldaufnahmeImport: true, _faMeasurement: true,
+      _feldaufnahmeImport: true, _faMeasurement: true, _noSelect: true,
     });
-
     canvas.add(dashLine, valueLabel);
-    importedObjects.push(dashLine, valueLabel);
+    nM++;
   });
 
+  sendPipesToBack();
   canvas.renderAll();
   saveSnapshot();
 
-  const nEl = (data.elements || []).length;
-  const nM = (data.measurements || []).length;
-  showToast(`Feldaufnahme importiert: ${nEl} Element${nEl !== 1 ? 'e' : ''}, ${nM} Messung${nM !== 1 ? 'en' : ''}`, 'success');
+  const parts = [];
+  if (nPoints) parts.push(nPoints + ' Hilfspunkt' + (nPoints > 1 ? 'e' : ''));
+  if (nLines) parts.push(nLines + ' Hilfslinie' + (nLines > 1 ? 'n' : ''));
+  if (nAreas) parts.push(nAreas + ' Fläche' + (nAreas > 1 ? 'n' : ''));
+  if (nM) parts.push(nM + ' Messung' + (nM > 1 ? 'en' : ''));
+  showToast('Feldaufnahme importiert: ' + parts.join(', '), 'success');
 }
 
 document.getElementById('feldaufnahme-import-input').onchange = e => {
