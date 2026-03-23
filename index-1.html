@@ -2596,10 +2596,10 @@ function setTool(t) {
   if (t === 'select') _loupe.hide();
   if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
   canvas.forEachObject(o => {
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
+    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && !!o._feldaufnahmeImport && !o._faMeasurement);
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot;
+    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, feldaufnahme imports
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || (!!o._feldaufnahmeImport && !o._faMeasurement);
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
