@@ -1506,6 +1506,7 @@
     <button id="btn-central-save" title="Speichern / Exportieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
     <button id="btn-central-load" title="Laden / Importieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
     <input type="file" id="json-input" accept=".json" style="display:none;" />
+    <input type="file" id="feldaufnahme-import-input" accept=".json" style="display:none;" />
     <!-- Hidden elements kept for compatibility -->
     <button id="btn-save-json" style="display:none;"></button>
     <button id="btn-load-json" style="display:none;"></button>
@@ -2375,13 +2376,15 @@ initCustomLib()
 // =========================================================
 const CANVAS_SERIAL_PROPS = ['_measureId','_isRef','_noSelect','_circlePreview','_arcPreview',
   '_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset',
-  '_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib'];
+  '_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib',
+  '_dimLinePipeId','_dimDraggableFoot','_dimRefId','_dimMeasureId',
+  '_feldaufnahmeImport','_faElementId','_faType','_faMeasurement'];
 
-const history = { past: [], future: [], MAX: 40, _paused: false };
+const history = { past: [], future: [], MAX: 40, _paused: false, _restoring: false };
 
 function getSnapshot() {
   const json = canvas.toJSON(CANVAS_SERIAL_PROPS);
-  json.objects = (json.objects || []).filter(o => !o._isBackground);
+  json.objects = (json.objects || []).filter(o => !o._isBackground && o._dimLinePipeId == null);
   return {
     canvas:        JSON.stringify(json),
     measurements:  JSON.stringify(state.measurements),
@@ -2405,6 +2408,7 @@ function saveSnapshot() {
 
 function restoreSnapshot(snap) {
   history._paused = true;
+  history._restoring = true;
   const bg = state.backgroundImage;
   canvas.loadFromJSON(JSON.parse(snap.canvas), () => {
     if (bg) { canvas.add(bg); canvas.sendToBack(bg); }
@@ -2427,18 +2431,19 @@ function restoreSnapshot(snap) {
     canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
     renderAllDimLines();
     history._paused = false;
+    history._restoring = false;
     updateUndoRedoButtons();
   });
 }
 
 function undo() {
-  if (!history.past.length) return;
+  if (history._restoring || !history.past.length) return;
   history.future.push(getSnapshot());
   restoreSnapshot(history.past.pop());
 }
 
 function redo() {
-  if (!history.future.length) return;
+  if (history._restoring || !history.future.length) return;
   history.past.push(getSnapshot());
   restoreSnapshot(history.future.pop());
 }
@@ -2446,8 +2451,8 @@ function redo() {
 function updateUndoRedoButtons() {
   const u = document.getElementById('btn-undo');
   const r = document.getElementById('btn-redo');
-  if (u) u.disabled = history.past.length === 0;
-  if (r) r.disabled = history.future.length === 0;
+  if (u) u.disabled = history._restoring || history.past.length === 0;
+  if (r) r.disabled = history._restoring || history.future.length === 0;
 }
 
 // =========================================================
@@ -6941,6 +6946,7 @@ function openLoadModal() {
       <div style="display:flex;flex-direction:column;gap:6px;">
         ${_saveOptionHTML('load-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', 'Projekt laden (.json)', 'Gespeichertes Projekt öffnen und weiterarbeiten')}
         ${_saveOptionHTML('load-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Leitungen einmessen', 'Gespeicherte Leitungen in neues Luftbild übertragen')}
+        ${_saveOptionHTML('load-feldaufnahme', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>', 'Feldaufnahme importieren', 'Elemente und Maße aus der Feldaufnahme-App übernehmen')}
       </div>
       <div class="btn-row" style="margin-top:12px;">
         <button id="sl-close">Abbrechen</button>
@@ -6957,6 +6963,7 @@ function openLoadModal() {
       const action = opt.dataset.action;
       if (action === 'load-project') document.getElementById('json-input').click();
       else if (action === 'load-pipes') document.getElementById('leitungen-import-input').click();
+      else if (action === 'load-feldaufnahme') document.getElementById('feldaufnahme-import-input').click();
     };
   });
 
@@ -7146,7 +7153,7 @@ function doSaveProjectJSON() {
     measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
     pipeReferences: state.pipeReferences,
     activePipeRefs: state.activePipeRefs,
-    canvas: canvas.toJSON(['_measureId','_isRef','_noSelect','_circlePreview','_arcPreview','_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset','_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib']),
+    canvas: canvas.toJSON(['_measureId','_isRef','_noSelect','_circlePreview','_arcPreview','_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset','_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib','_feldaufnahmeImport','_faElementId','_faType','_faMeasurement']),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const file = new File([blob], 'gartenplan.json', { type: 'application/json' });
@@ -7209,6 +7216,190 @@ document.getElementById('json-input').onchange = e => {
         showToast('Projekt geladen', 'success');
       });
     } catch { showToast('Fehler beim Laden der Datei.', 'error'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+};
+
+// =========================================================
+// FELDAUFNAHME IMPORT (Desktop only)
+// =========================================================
+
+function importFeldaufnahme(data) {
+  if (!state.backgroundImage) {
+    showToast('Bitte zuerst ein Hintergrundbild laden.', 'error');
+    return;
+  }
+  if (data.type !== 'feldaufnahme' || !Array.isArray(data.elements)) {
+    showToast('Ungültiges Feldaufnahme-Format.', 'error');
+    return;
+  }
+
+  const bg = state.backgroundImage;
+  const s = state.imgDisplayScale;
+  const offX = bg.left;
+  const offY = bg.top;
+
+  // Map original-pixel coords → canvas coords
+  const toCanvas = (x, y) => ({ x: x * s + offX, y: y * s + offY });
+
+  const importedObjects = [];
+  const idMap = {}; // feldaufnahme elementId → label (for measurement display)
+
+  const markerRadius = 6;
+  const labelFontSize = state.fontSize || 13;
+  const strokeColor = '#e74c3c';
+  const fillColor = 'rgba(231, 76, 60, 0.15)';
+
+  // Import elements
+  (data.elements || []).forEach(el => {
+    idMap[el.id] = el.label || ('Element ' + el.id);
+
+    if (el.type === 'point' && el.position) {
+      const p = toCanvas(el.position.x, el.position.y);
+      const circle = new fabric.Circle({
+        left: p.x - markerRadius, top: p.y - markerRadius,
+        radius: markerRadius, fill: strokeColor, opacity: 0.85,
+        originX: 'left', originY: 'top',
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'point',
+      });
+      const label = new fabric.Text(el.label || '', {
+        left: p.x + markerRadius + 4, top: p.y - labelFontSize / 2,
+        fontSize: labelFontSize, fill: '#fff',
+        fontFamily: 'DM Sans, sans-serif',
+        shadow: '1px 1px 2px rgba(0,0,0,0.7)',
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'point-label',
+      });
+      canvas.add(circle, label);
+      importedObjects.push(circle, label);
+
+    } else if (el.type === 'line' && Array.isArray(el.points) && el.points.length >= 2) {
+      const pts = el.points.map(p => toCanvas(p.x, p.y));
+      const flatPts = pts.flatMap(p => [p.x, p.y]);
+      const line = new fabric.Polyline(pts.map(p => ({x: p.x, y: p.y})), {
+        fill: 'transparent', stroke: strokeColor, strokeWidth: 2.5, opacity: 0.85,
+        selectable: true, objectCaching: false,
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line',
+      });
+      // Label at midpoint
+      const mid = pts[Math.floor(pts.length / 2)];
+      const label = new fabric.Text(el.label || '', {
+        left: mid.x + 6, top: mid.y - labelFontSize / 2,
+        fontSize: labelFontSize, fill: '#fff',
+        fontFamily: 'DM Sans, sans-serif',
+        shadow: '1px 1px 2px rgba(0,0,0,0.7)',
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line-label',
+      });
+      canvas.add(line, label);
+      importedObjects.push(line, label);
+      // Endpoint dots
+      pts.forEach(p => {
+        const dot = new fabric.Circle({
+          left: p.x - 3, top: p.y - 3, radius: 3,
+          fill: strokeColor, opacity: 0.7,
+          selectable: false, evented: false,
+          _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'line-dot',
+        });
+        canvas.add(dot);
+        importedObjects.push(dot);
+      });
+
+    } else if (el.type === 'area' && Array.isArray(el.points) && el.points.length >= 3) {
+      const pts = el.points.map(p => toCanvas(p.x, p.y));
+      const polygon = new fabric.Polygon(pts.map(p => ({x: p.x, y: p.y})), {
+        fill: fillColor, stroke: strokeColor, strokeWidth: 2, opacity: 0.85,
+        selectable: true, objectCaching: false,
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'area',
+      });
+      // Label at centroid
+      const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+      const label = new fabric.Text(el.label || '', {
+        left: cx, top: cy - labelFontSize / 2,
+        fontSize: labelFontSize, fill: '#fff',
+        fontFamily: 'DM Sans, sans-serif',
+        shadow: '1px 1px 2px rgba(0,0,0,0.7)',
+        originX: 'center',
+        _feldaufnahmeImport: true, _faElementId: el.id, _faType: 'area-label',
+      });
+      canvas.add(polygon, label);
+      importedObjects.push(polygon, label);
+    }
+  });
+
+  // Import measurements as annotation lines + value labels
+  (data.measurements || []).forEach(m => {
+    const elA = (data.elements || []).find(e => e.id === m.fromId);
+    const elB = (data.elements || []).find(e => e.id === m.toId);
+    if (!elA || !elB) return;
+
+    // Get center point of each element
+    const centerOf = el => {
+      if (el.type === 'point' && el.position) return toCanvas(el.position.x, el.position.y);
+      if (el.type === 'line' && el.points && el.points.length >= 2) {
+        const mid = el.points[Math.floor(el.points.length / 2)];
+        return toCanvas(mid.x, mid.y);
+      }
+      if (el.type === 'area' && el.points && el.points.length >= 3) {
+        const cx = el.points.reduce((s, p) => s + p.x, 0) / el.points.length;
+        const cy = el.points.reduce((s, p) => s + p.y, 0) / el.points.length;
+        return toCanvas(cx, cy);
+      }
+      return null;
+    };
+
+    const pA = centerOf(elA);
+    const pB = centerOf(elB);
+    if (!pA || !pB) return;
+
+    // Dashed measurement line
+    const dashLine = new fabric.Line([pA.x, pA.y, pB.x, pB.y], {
+      stroke: '#888', strokeWidth: 1.5, strokeDashArray: [6, 4],
+      selectable: false, evented: false, opacity: 0.8,
+      _feldaufnahmeImport: true, _faMeasurement: true,
+    });
+
+    // Value label at midpoint
+    const valueStr = (typeof m.value_m === 'number')
+      ? m.value_m.toFixed(2).replace('.', ',') + ' m'
+      : '? m';
+    const typeStr = m.type === 'perpendicular' ? ' ⊥' : '';
+    const mx = (pA.x + pB.x) / 2;
+    const my = (pA.y + pB.y) / 2;
+    const valueLabel = new fabric.Text(valueStr + typeStr, {
+      left: mx, top: my - 8,
+      fontSize: 11, fill: '#ccc',
+      fontFamily: 'DM Sans, sans-serif',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      padding: 3, originX: 'center',
+      selectable: false, evented: false,
+      _feldaufnahmeImport: true, _faMeasurement: true,
+    });
+
+    canvas.add(dashLine, valueLabel);
+    importedObjects.push(dashLine, valueLabel);
+  });
+
+  canvas.renderAll();
+  saveSnapshot();
+
+  const nEl = (data.elements || []).length;
+  const nM = (data.measurements || []).length;
+  showToast(`Feldaufnahme importiert: ${nEl} Element${nEl !== 1 ? 'e' : ''}, ${nM} Messung${nM !== 1 ? 'en' : ''}`, 'success');
+}
+
+document.getElementById('feldaufnahme-import-input').onchange = e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.type === 'feldaufnahme') {
+        importFeldaufnahme(data);
+      } else {
+        showToast('Keine gültige Feldaufnahme-Datei.', 'error');
+      }
+    } catch { showToast('Fehler beim Lesen der Datei.', 'error'); }
   };
   reader.readAsText(file);
   e.target.value = '';

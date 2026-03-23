@@ -1,0 +1,2330 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#252627" />
+  <title>Feldaufnahme</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: #f0f0f0;
+      color: #2d2d2d;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    #header {
+      background: #252627;
+      padding: 0 16px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #3a3a3a;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    #header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #header .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #header .header-actions button,
+    #header .header-actions .file-trigger {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    #header .header-actions button:hover,
+    #header .header-actions .file-trigger:hover {
+      background: rgba(255,255,255,0.14);
+      color: #fff;
+    }
+    #header .header-actions .header-divider {
+      width: 1px; height: 24px; background: #3a3a3a; margin: 0 4px;
+    }
+
+    /* ── Canvas ── */
+    #canvas-wrapper { flex: 1; overflow: hidden; position: relative; background: #f0f0f0; }
+    canvas { display: block; }
+
+    /* ── Zoom HUD ── */
+    #zoom-hud {
+      position: absolute;
+      bottom: 14px; right: 14px;
+      background: rgba(0,0,0,0.48);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #fff;
+      font-size: 12px; font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      user-select: none;
+    }
+    #zoom-hud.visible { opacity: 1; }
+    #zoom-hud.fading { opacity: 0; transition: opacity 0.6s; }
+
+    /* ── Drop overlay ── */
+    #drop-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px;
+      pointer-events: auto;
+      z-index: 50;
+      background: #f0f0f0;
+    }
+    #drop-overlay.hidden { display: none; }
+
+    /* ── Status bar (mobile) ── */
+    #status-bar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 600;
+      background: rgba(40,40,50,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      padding: 6px 16px;
+      padding-top: max(6px, env(safe-area-inset-top));
+    }
+    html.touch-device #status-bar.visible { display: block; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+      padding: 16px;
+    }
+    .modal {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px 22px;
+      width: 340px;
+      max-width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px #e5e7eb;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal h2 { color: #2d2d2d; margin-bottom: 12px; font-size: 16px; font-weight: 700; }
+    .modal p { font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.5; }
+    .modal input, .modal select {
+      width: 100%; padding: 8px 11px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px; color: #2d2d2d; font-size: 14px;
+      margin-bottom: 10px; font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    .modal input:focus, .modal select:focus {
+      outline: none; border-color: #8B3DFF; background: #fff;
+    }
+    .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+    .modal .btn-row button {
+      padding: 7px 16px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 500;
+    }
+    #modal-ok { background: #8B3DFF !important; color: #fff !important; }
+    #modal-ok:hover { background: #7B2FBE !important; }
+    @media (max-width: 480px) {
+      .modal { width: 94vw; padding: 18px 16px; }
+    }
+
+    /* ── Buttons ── */
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #374151;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #f3f4f6; color: #2d2d2d; }
+    button.active { background: #f0ebff; color: #7B2FBE; font-weight: 600; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    /* ── Touch-Hilfsstil ── */
+    html.touch-device { overflow: hidden; position: fixed; width: 100%; height: 100%; }
+    html.touch-device body { position: fixed; width: 100%; height: 100%; }
+    html.touch-device #header { display: none !important; }
+    html.touch-device #zoom-hud { font-size: 16px; bottom: 60px; }
+
+    /* ── Mobile Magnifier Circles ── */
+    .mobile-mag {
+      display: none;
+      position: fixed;
+      top: 12px;
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(0,0,0,0.22);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22), inset 0 0 0 1.5px rgba(255,255,255,0.5);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 9998;
+      background: #fff;
+    }
+    .mobile-mag canvas { display: block; }
+    .mobile-mag-label {
+      position: absolute;
+      bottom: 6px; left: 0; right: 0;
+      text-align: center;
+      font-size: 9px; font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      pointer-events: none;
+    }
+    #mobile-mag-start { left: 12px; }
+    #mobile-mag-end { right: 12px; }
+    html.touch-device .mobile-mag.visible { display: block; }
+
+    /* ── Mobile Crosshair ── */
+    #mobile-crosshair {
+      display: none;
+      position: fixed;
+      width: 120px; height: 120px;
+      pointer-events: none;
+      z-index: 500;
+      transform: translate(-50%, -50%);
+    }
+    #mobile-crosshair.visible { display: block; }
+    #mobile-crosshair .ch-h,
+    #mobile-crosshair .ch-v {
+      position: absolute;
+      background: rgba(210,30,30,0.75);
+    }
+    #mobile-crosshair .ch-h {
+      left: 0; right: 0; top: 50%;
+      height: 1.5px; transform: translateY(-0.75px);
+    }
+    #mobile-crosshair .ch-v {
+      top: 0; bottom: 0; left: 50%;
+      width: 1.5px; transform: translateX(-0.75px);
+    }
+    #mobile-crosshair .ch-dot {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 10px; height: 10px;
+      border: 1.5px solid rgba(210,30,30,0.9);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.5);
+    }
+
+    /* ── Mobile Finish Button ── */
+    #mobile-finish-btn {
+      display: none;
+      position: fixed;
+      bottom: 74px; right: 16px;
+      z-index: 495;
+      min-width: 56px; min-height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 24px; font-weight: 700;
+      box-shadow: 0 4px 16px rgba(123,47,190,0.4);
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    html.touch-device #mobile-finish-btn.visible { display: flex; }
+
+    /* ── Mobile Bottom Toolbar ── */
+    #touch-toolbar {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 490;
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,0,0,0.08);
+      padding: 4px 4px;
+      padding-bottom: max(4px, env(safe-area-inset-bottom));
+      flex-direction: row;
+      justify-content: space-around;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #touch-toolbar::-webkit-scrollbar { display: none; }
+    html.touch-device #touch-toolbar { display: flex; }
+    #touch-toolbar button {
+      flex: 0 0 auto;
+      min-width: 44px; min-height: 44px;
+      border: none; background: transparent;
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 600; color: #666;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 2px 6px;
+      gap: 1px;
+    }
+    #touch-toolbar button svg { width: 22px; height: 22px; }
+    #touch-toolbar button.active { background: #f0ebff; color: #7B2FBE; }
+    #touch-toolbar .tt-sep {
+      width: 1px; height: 28px; background: rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    @media (orientation: landscape) {
+      #touch-toolbar button span { display: none; }
+      #touch-toolbar button { min-width: 40px; padding: 4px; }
+    }
+
+    /* ── Mobile Onboarding Overlay ── */
+    #mobile-onboarding {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.82);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      gap: 28px;
+      color: #fff;
+      font-family: inherit;
+    }
+    #mobile-onboarding.visible { display: flex; }
+    #mobile-onboarding .ob-step {
+      display: flex; align-items: flex-start; gap: 14px; max-width: 320px;
+    }
+    #mobile-onboarding .ob-num {
+      flex: 0 0 auto;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #mobile-onboarding .ob-text {
+      font-size: 15px; line-height: 1.45; color: rgba(255,255,255,0.92);
+    }
+    #mobile-onboarding .ob-text strong { color: #fff; }
+    #mobile-onboarding .ob-dismiss {
+      margin-top: 8px;
+      padding: 12px 36px;
+      border: none;
+      border-radius: 12px;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 15px; font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    /* ── Mobile Menu ── */
+    #mobile-menu-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 9000;
+    }
+    #mobile-menu-backdrop.visible { display: block; }
+    #mobile-menu {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 9001;
+      background: #252627;
+      border-radius: 16px 16px 0 0;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      max-height: 70vh;
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.25s ease-out;
+    }
+    #mobile-menu.visible {
+      display: block;
+      transform: translateY(0);
+    }
+    #mobile-menu .mm-handle {
+      width: 36px; height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    #mobile-menu .mm-section { margin-bottom: 12px; }
+    #mobile-menu .mm-section-title {
+      font-size: 10px; font-weight: 600;
+      color: rgba(255,255,255,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+    }
+    #mobile-menu .mm-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .mm-btn {
+      flex: 0 0 auto;
+      padding: 8px 14px !important;
+      border-radius: 10px !important;
+      background: rgba(255,255,255,0.08) !important;
+      color: #ccc !important;
+      font-size: 12px !important;
+      font-weight: 500 !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+    .mm-btn svg { width: 16px; height: 16px; }
+    .mm-btn:active { background: rgba(255,255,255,0.16) !important; }
+    .mm-btn.danger { color: #ff6b6b !important; }
+
+    /* ── Element list drawer ── */
+    #element-drawer {
+      display: none;
+      position: fixed;
+      bottom: 56px;
+      bottom: calc(56px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      z-index: 488;
+      max-height: 50vh;
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.12);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 12px 16px;
+    }
+    #element-drawer.visible { display: block; }
+    .drawer-title {
+      font-size: 12px; font-weight: 700; color: #2d2d2d;
+      margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .el-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 6px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 13px;
+    }
+    .el-item:last-child { border-bottom: none; }
+    .el-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: #f0ebff;
+      color: #7B2FBE;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .el-label { flex: 1; font-weight: 500; }
+    .el-type { font-size: 10px; color: #9ca3af; }
+    .el-delete {
+      padding: 4px 8px !important;
+      color: #dc2626 !important;
+      font-size: 11px !important;
+      background: transparent !important;
+    }
+    .meas-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+      color: #636366;
+    }
+    .meas-value {
+      font-weight: 700;
+      color: #2d2d2d;
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    Feldaufnahme
+  </h1>
+  <div class="header-actions">
+    <label for="file-input" class="file-trigger">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Bild laden
+    </label>
+    <input type="file" id="file-input" accept="image/*,application/pdf" style="display:none;" />
+    <div class="header-divider"></div>
+    <button id="btn-save">Speichern</button>
+    <button id="btn-load-project">Laden</button>
+    <input type="file" id="project-input" accept=".json" style="display:none;" />
+    <div class="header-divider"></div>
+    <button id="btn-export">Exportieren</button>
+  </div>
+</div>
+
+<div id="canvas-wrapper">
+  <canvas id="c"></canvas>
+  <div id="zoom-hud">100%</div>
+  <div id="drop-overlay">
+    <div style="opacity:0.18;margin-bottom:14px;">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div style="font-size:17px;font-weight:600;color:#3c3c43;margin-bottom:6px;">Bild oder PDF laden</div>
+    <div style="font-size:13px;color:#8e8e93;">
+      <label for="file-input" class="file-trigger"
+        style="color:#8B3DFF;font-weight:600;font-size:15px;padding:12px 20px;display:inline-block;cursor:pointer;">
+        Datei auswahlen
+      </label>
+      <span class="drop-hint-desktop" style="display:block;margin-top:4px;font-size:12px;">oder hierher ziehen</span>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar"></div>
+
+<div id="mobile-mag-start" class="mobile-mag"><span class="mobile-mag-label">A</span></div>
+<div id="mobile-mag-end" class="mobile-mag"><span class="mobile-mag-label">B</span></div>
+<div id="mobile-crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
+<button id="mobile-finish-btn" title="Abschliessen">&#10003;</button>
+
+<div id="mobile-onboarding">
+  <div class="ob-step">
+    <span class="ob-num">1</span>
+    <span class="ob-text"><strong>Tippen</strong> — setzt einen Punkt mit Fadenkreuz</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">2</span>
+    <span class="ob-text"><strong>Ziehen</strong> — Punkt genau positionieren (Lupe zeigt Detail)</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">3</span>
+    <span class="ob-text"><strong>Loslassen</strong> — Punkt wird bestatigt</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">&#10003;</span>
+    <span class="ob-text">Bei Linie / Flache: <strong>&#10003;-Button</strong> drucken zum Abschliessen</span>
+  </div>
+  <button class="ob-dismiss" id="mobile-ob-dismiss">Verstanden</button>
+</div>
+
+<div id="element-drawer"></div>
+
+<div id="touch-toolbar">
+  <button id="tt-select" title="Auswahl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Auswahl</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-point" title="Punkt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"/></svg><span>Punkt</span></button>
+  <button id="tt-line" title="Linie"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 20 8 10 14 14 20 4"/></svg><span>Linie</span></button>
+  <button id="tt-area" title="Flache"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg><span>Flache</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-measure" title="Messen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 12h4"/></svg><span>Messen</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-undo" title="Ruckgangig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg><span>Undo</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-more" title="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg><span>Menu</span></button>
+</div>
+
+<!-- Mobile Menu -->
+<div id="mobile-menu-backdrop"></div>
+<div id="mobile-menu">
+  <div class="mm-handle"></div>
+  <div class="mm-section">
+    <div class="mm-section-title">Datei</div>
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bild laden</button>
+      <button class="mm-btn" id="mm-save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
+      <button class="mm-btn" id="mm-load"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
+    </div>
+  </div>
+  <div class="mm-section">
+    <div class="mm-section-title">Export</div>
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Fur Planer exportieren</button>
+    </div>
+  </div>
+  <div class="mm-section">
+    <div class="mm-section-title">Bearbeiten</div>
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Undo</button>
+      <button class="mm-btn" id="mm-redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Redo</button>
+      <button class="mm-btn" id="mm-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Elemente</button>
+      <button class="mm-btn danger" id="mm-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Alles loschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// TOUCH DETECTION
+// =========================================================
+const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (_isTouchDevice) document.documentElement.classList.add('touch-device');
+
+// =========================================================
+// STATE
+// =========================================================
+const state = {
+  tool: 'select',
+  backgroundImage: null,
+  backgroundInfo: null,
+  imgDisplayScale: 1,
+  zoom: 1,
+  panning: false,
+  lastPan: null,
+  spacePan: false,
+  // Line tool
+  linePoints: [],
+  drawingLine: null,
+  // Area tool
+  areaPoints: [],
+  drawingPolygon: null,
+  // Measure tool
+  measureStep: 0,
+  measureFromId: null,
+  measureType: 'distance',
+  // Selection
+  selectedElementId: null,
+};
+
+let elementId = 0;
+const elements = [];
+
+let measurementId = 0;
+const measurements = [];
+
+// =========================================================
+// CANVAS
+// =========================================================
+const wrapper = document.getElementById('canvas-wrapper');
+const canvas = new fabric.Canvas('c', {
+  width: wrapper.clientWidth,
+  height: wrapper.clientHeight,
+  selection: false,
+  backgroundColor: '#e8e8e8',
+});
+
+// =========================================================
+// CANVAS SERIAL PROPS (for undo/redo)
+// =========================================================
+const CANVAS_SERIAL_PROPS = [
+  '_elementId', '_elementType', '_measurementId',
+  '_isBackground', '_noSelect', '_tempDraw',
+];
+
+// =========================================================
+// UNDO / REDO
+// =========================================================
+const history = { past: [], future: [], MAX: 40, _paused: false, _restoring: false };
+
+function getSnapshot() {
+  const json = canvas.toJSON(CANVAS_SERIAL_PROPS);
+  json.objects = (json.objects || []).filter(o => !o._isBackground && !o._tempDraw);
+  return {
+    canvas: JSON.stringify(json),
+    elements: JSON.stringify(elements),
+    measurements: JSON.stringify(measurements),
+    elementId: elementId,
+    measurementId: measurementId,
+  };
+}
+
+function saveSnapshot() {
+  if (history._paused) return;
+  history.past.push(getSnapshot());
+  if (history.past.length > history.MAX) history.past.shift();
+  history.future = [];
+  updateUndoBtn();
+}
+
+function restoreSnapshot(snap) {
+  history._paused = true;
+  history._restoring = true;
+  const bg = state.backgroundImage;
+  canvas.loadFromJSON(JSON.parse(snap.canvas), () => {
+    if (bg) { canvas.add(bg); canvas.sendToBack(bg); }
+    state.backgroundImage = bg;
+    elements.length = 0;
+    JSON.parse(snap.elements).forEach(e => elements.push(e));
+    measurements.length = 0;
+    JSON.parse(snap.measurements).forEach(m => measurements.push(m));
+    elementId = snap.elementId;
+    measurementId = snap.measurementId;
+    canvas.renderAll();
+    history._paused = false;
+    history._restoring = false;
+    updateUndoBtn();
+  });
+}
+
+function undo() {
+  if (history._restoring || !history.past.length) return;
+  history.future.push(getSnapshot());
+  restoreSnapshot(history.past.pop());
+}
+
+function redo() {
+  if (history._restoring || !history.future.length) return;
+  history.past.push(getSnapshot());
+  restoreSnapshot(history.future.pop());
+}
+
+function updateUndoBtn() {
+  const u = document.getElementById('tt-undo');
+  if (u) u.disabled = history._restoring || history.past.length === 0;
+}
+
+// =========================================================
+// TOAST
+// =========================================================
+const TOAST_COLORS = {
+  error: 'rgba(220,38,38,0.93)',
+  warning: 'rgba(217,119,6,0.93)',
+  success: 'rgba(22,163,74,0.93)',
+  info: 'rgba(37,99,235,0.93)',
+};
+
+function showToast(msg, type = 'error') {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = `position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+      color:#fff;padding:9px 22px;border-radius:22px;
+      font-size:13px;font-weight:600;z-index:2000;pointer-events:none;
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      box-shadow:0 8px 24px rgba(0,0,0,0.18);transition:opacity 0.3s;
+      font-family:inherit;`;
+    document.body.appendChild(t);
+  }
+  t.style.background = TOAST_COLORS[type] || TOAST_COLORS.error;
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, type === 'error' ? 4500 : 3000);
+}
+
+function haptic(style = 'light') {
+  if (!navigator.vibrate) return;
+  switch (style) {
+    case 'light': navigator.vibrate(10); break;
+    case 'medium': navigator.vibrate(20); break;
+  }
+}
+
+// =========================================================
+// MODAL
+// =========================================================
+function createModal(title, bodyHTML, onConfirm, onCancel, okLabel = 'OK') {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>${title}</h2>
+      ${bodyHTML}
+      <div class="btn-row">
+        <button id="modal-cancel">Abbrechen</button>
+        <button id="modal-ok">${okLabel}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  let done = false;
+  const close = () => { if (done) return; done = true; document.body.removeChild(overlay); };
+  overlay.querySelector('#modal-ok').onclick = () => { if (!done) { onConfirm(); close(); } };
+  overlay.querySelector('#modal-cancel').onclick = () => { if (!done) { if (onCancel) onCancel(); close(); } };
+  overlay.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); if (!done) { onConfirm(); close(); } }
+    if (e.key === 'Escape') { e.preventDefault(); if (!done) { if (onCancel) onCancel(); close(); } }
+  });
+  const firstInput = overlay.querySelector('input');
+  if (firstInput) setTimeout(() => firstInput.focus(), 50);
+  return overlay;
+}
+
+// =========================================================
+// STATUS BAR
+// =========================================================
+const _statusBar = document.getElementById('status-bar');
+function showStatus(msg) {
+  _statusBar.textContent = msg;
+  _statusBar.classList.add('visible');
+}
+function hideStatus() {
+  _statusBar.classList.remove('visible');
+}
+
+// =========================================================
+// IMAGE / PDF LOADING
+// =========================================================
+function loadImageFromDataUrl(dataUrl, fileName) {
+  fabric.Image.fromURL(dataUrl, img => {
+    const scaleX = (canvas.width * 0.95) / img.width;
+    const scaleY = (canvas.height * 0.95) / img.height;
+    const s = Math.min(scaleX, scaleY, 1);
+    img.scale(s);
+    state.imgDisplayScale = s;
+    img.set({
+      left: (canvas.width - img.width * s) / 2,
+      top: (canvas.height - img.height * s) / 2,
+      selectable: false, evented: false, hasBorders: false, hasControls: false,
+      _noSelect: true, _isBackground: true,
+    });
+    state.backgroundImage = img;
+    state.backgroundInfo = { name: fileName || 'image', width: img.width, height: img.height };
+    canvas.clear();
+    canvas.add(img);
+    canvas.sendToBack(img);
+    document.getElementById('drop-overlay').classList.add('hidden');
+    // Clear all data
+    elements.length = 0;
+    measurements.length = 0;
+    elementId = 0;
+    measurementId = 0;
+    history.past = []; history.future = [];
+    updateUndoBtn();
+    updateElementDrawer();
+  });
+}
+
+async function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = e => loadImageFromDataUrl(e.target.result, file.name);
+  reader.readAsDataURL(file);
+}
+
+async function loadPdf(file) {
+  if (!window.pdfjsLib) { showToast('PDF.js nicht verfugbar.', 'error'); return; }
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdf.numPages;
+    const renderPage = async pageNum => {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 3 });
+      const c = document.createElement('canvas');
+      c.width = viewport.width;
+      c.height = viewport.height;
+      await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+      return c.toDataURL('image/png');
+    };
+    if (numPages === 1) {
+      const dataUrl = await renderPage(1);
+      loadImageFromDataUrl(dataUrl, file.name);
+    } else {
+      const bodyHTML = `
+        <p>Die PDF hat <b>${numPages} Seiten</b>. Welche Seite soll geladen werden?</p>
+        <input id="_pdf-page" type="number" min="1" max="${numPages}" value="1" />`;
+      createModal('PDF-Seite', bodyHTML, async () => {
+        const n = Math.min(numPages, Math.max(1, parseInt(document.getElementById('_pdf-page').value) || 1));
+        const dataUrl = await renderPage(n);
+        loadImageFromDataUrl(dataUrl, file.name);
+      });
+    }
+  } catch (err) {
+    showToast('PDF konnte nicht geladen werden.', 'error');
+  }
+}
+
+function loadFileAuto(file) {
+  if (!file) return;
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    loadPdf(file);
+  } else {
+    loadImage(file);
+  }
+}
+
+document.getElementById('file-input').onchange = e => { loadFileAuto(e.target.files[0]); };
+
+wrapper.addEventListener('dragover', e => { e.preventDefault(); wrapper.style.outline = '3px dashed #4ecca3'; });
+wrapper.addEventListener('dragleave', () => { wrapper.style.outline = ''; });
+wrapper.addEventListener('drop', e => {
+  e.preventDefault();
+  wrapper.style.outline = '';
+  const file = e.dataTransfer.files[0];
+  if (file && (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) loadFileAuto(file);
+});
+
+// =========================================================
+// ZOOM / PAN
+// =========================================================
+let _zoomHudTimer;
+function showZoomHUD(z) {
+  const hud = document.getElementById('zoom-hud');
+  hud.textContent = Math.round(z * 100) + '%';
+  hud.classList.remove('fading');
+  hud.classList.add('visible');
+  clearTimeout(_zoomHudTimer);
+  _zoomHudTimer = setTimeout(() => {
+    hud.classList.add('fading');
+    setTimeout(() => hud.classList.remove('visible', 'fading'), 650);
+  }, 900);
+}
+
+function setZoom(z, point) {
+  z = Math.min(Math.max(z, 0.05), 20);
+  if (point && isFinite(point.x) && isFinite(point.y)) canvas.zoomToPoint(point, z);
+  else canvas.setZoom(z);
+  state.zoom = z;
+  showZoomHUD(z);
+}
+
+// Mouse wheel zoom (desktop)
+wrapper.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  const rect = wrapper.getBoundingClientRect();
+  setZoom(canvas.getZoom() * delta, { x: e.clientX - rect.left, y: e.clientY - rect.top });
+}, { passive: false });
+
+// Space-bar pan (desktop)
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && !e.target.matches('input,textarea,select')) {
+    e.preventDefault();
+    state.spacePan = true;
+    canvas.defaultCursor = 'grab';
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') {
+    state.spacePan = false;
+    canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
+    if (state.panning) { state.panning = false; }
+  }
+});
+document.addEventListener('mousemove', e => {
+  if (!state.panning) return;
+  const dx = e.clientX - state.lastPan.x;
+  const dy = e.clientY - state.lastPan.y;
+  state.lastPan = { x: e.clientX, y: e.clientY };
+  const vpt = canvas.viewportTransform.slice();
+  vpt[4] += dx; vpt[5] += dy;
+  canvas.setViewportTransform(vpt);
+});
+document.addEventListener('mouseup', () => {
+  if (state.panning) { state.panning = false; canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair'; }
+});
+
+// Ctrl+Z / Ctrl+Y
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+});
+
+// =========================================================
+// TOOL MANAGEMENT
+// =========================================================
+function setTool(t) {
+  // Try mobile onboarding
+  _tryMobileOnboarding(t);
+
+  state.tool = t;
+  clearTempDrawing();
+  state.measureStep = 0;
+  state.measureFromId = null;
+  clearSelection();
+
+  canvas.defaultCursor = t === 'select' ? 'default' : 'crosshair';
+  canvas.forEachObject(o => {
+    if (o._isBackground || o._noSelect) return;
+    o.selectable = (t === 'select');
+    o.evented = (t === 'select');
+  });
+
+  // Update toolbar active state
+  document.querySelectorAll('#touch-toolbar button').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById('tt-' + t);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Status hints
+  hideStatus();
+  if (t === 'point') showStatus('Tippe, um einen Punkt zu setzen');
+  if (t === 'line') showStatus('Tippe Punkte fur eine Linie');
+  if (t === 'area') showStatus('Tippe Punkte fur eine Flache');
+  if (t === 'measure') showStatus('Tippe auf Element A');
+}
+
+function clearTempDrawing() {
+  canvas.getObjects().filter(o => o._tempDraw).forEach(o => canvas.remove(o));
+  state.linePoints = [];
+  state.areaPoints = [];
+  state.drawingLine = null;
+  state.drawingPolygon = null;
+  _finishBtn.classList.remove('visible');
+  canvas.renderAll();
+}
+
+function clearSelection() {
+  canvas.discardActiveObject();
+  // Remove highlight from selected element
+  if (state.selectedElementId != null) {
+    canvas.getObjects().filter(o => o._elementId === state.selectedElementId).forEach(o => {
+      o.set({ shadow: null });
+    });
+    state.selectedElementId = null;
+    canvas.renderAll();
+  }
+}
+
+// =========================================================
+// ONBOARDING
+// =========================================================
+const _OB_TOOLS = ['point', 'line', 'area'];
+function _tryMobileOnboarding(t) {
+  if (!_OB_TOOLS.includes(t)) return;
+  if (!_isTouchDevice || localStorage.getItem('fa_mobile_ob_seen')) return;
+  const el = document.getElementById('mobile-onboarding');
+  if (el) el.classList.add('visible');
+}
+document.getElementById('mobile-ob-dismiss').onclick = () => {
+  localStorage.setItem('fa_mobile_ob_seen', '1');
+  document.getElementById('mobile-onboarding').classList.remove('visible');
+};
+
+// =========================================================
+// SNAP TO PIXEL
+// =========================================================
+function snapToPixel(p) {
+  const img = state.backgroundImage;
+  if (!img) return p;
+  const s = state.imgDisplayScale;
+  const origX = Math.round((p.x - img.left) / s);
+  const origY = Math.round((p.y - img.top) / s);
+  return { x: img.left + origX * s, y: img.top + origY * s };
+}
+
+// =========================================================
+// RENDER HELPERS
+// =========================================================
+let _rafPending = false;
+function throttledRender() {
+  if (_rafPending) return;
+  _rafPending = true;
+  requestAnimationFrame(() => { _rafPending = false; canvas.renderAll(); });
+}
+
+const MARKER_RADIUS = 6;
+const LINE_WIDTH = 2.5;
+const LABEL_FONT_SIZE = 12;
+const ELEMENT_COLOR = '#E65100';
+const MEASURE_COLOR = '#888';
+
+// =========================================================
+// POINT TOOL
+// =========================================================
+function placePoint(pos) {
+  const id = ++elementId;
+  const bodyHTML = `<input id="_el-label" type="text" placeholder="z.B. Schacht S1, Baum, Hydrant" value="" />`;
+  createModal('Punkt benennen', bodyHTML, () => {
+    const label = document.getElementById('_el-label').value.trim() || ('P' + id);
+    const el = { id, type: 'point', label, position: { x: pos.x, y: pos.y } };
+    elements.push(el);
+    renderPointElement(el);
+    saveSnapshot();
+    updateElementDrawer();
+  }, () => {
+    elementId--; // revert
+  });
+}
+
+function renderPointElement(el) {
+  const p = el.position;
+  const marker = new fabric.Circle({
+    left: p.x, top: p.y,
+    radius: MARKER_RADIUS,
+    fill: ELEMENT_COLOR,
+    stroke: '#fff',
+    strokeWidth: 2,
+    originX: 'center', originY: 'center',
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'point', _noSelect: true,
+  });
+  const text = new fabric.Text(el.label, {
+    left: p.x + MARKER_RADIUS + 4, top: p.y - LABEL_FONT_SIZE / 2,
+    fontSize: LABEL_FONT_SIZE,
+    fontFamily: 'DM Sans, sans-serif',
+    fontWeight: '600',
+    fill: '#2d2d2d',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    padding: 2,
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'point', _noSelect: true,
+  });
+  canvas.add(marker, text);
+  canvas.renderAll();
+}
+
+// =========================================================
+// LINE TOOL
+// =========================================================
+function handleLineClick(pos) {
+  state.linePoints.push(pos);
+
+  // Remove old preview
+  if (state.drawingLine) { canvas.remove(state.drawingLine); state.drawingLine = null; }
+
+  if (state.linePoints.length >= 2) {
+    // Draw preview polyline
+    state.drawingLine = new fabric.Polyline(state.linePoints.map(p => ({ x: p.x, y: p.y })), {
+      stroke: ELEMENT_COLOR,
+      strokeWidth: LINE_WIDTH,
+      fill: 'transparent',
+      selectable: false, evented: false,
+      _tempDraw: true,
+    });
+    canvas.add(state.drawingLine);
+
+    _finishBtn.classList.add('visible');
+  }
+
+  // Draw dot at each point
+  const dot = new fabric.Circle({
+    left: pos.x, top: pos.y, radius: 3,
+    fill: ELEMENT_COLOR, originX: 'center', originY: 'center',
+    selectable: false, evented: false, _tempDraw: true,
+  });
+  canvas.add(dot);
+  canvas.renderAll();
+}
+
+function finishLine() {
+  if (state.linePoints.length < 2) return;
+  const points = state.linePoints.map(p => ({ x: p.x, y: p.y }));
+  clearTempDrawing();
+
+  const id = ++elementId;
+  const bodyHTML = `<input id="_el-label" type="text" placeholder="z.B. Bordstein, Gebaudekante" value="" />`;
+  createModal('Linie benennen', bodyHTML, () => {
+    const label = document.getElementById('_el-label').value.trim() || ('L' + id);
+    const el = { id, type: 'line', label, points };
+    elements.push(el);
+    renderLineElement(el);
+    saveSnapshot();
+    updateElementDrawer();
+  }, () => { elementId--; });
+}
+
+function renderLineElement(el) {
+  const polyline = new fabric.Polyline(el.points, {
+    stroke: ELEMENT_COLOR,
+    strokeWidth: LINE_WIDTH,
+    fill: 'transparent',
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'line', _noSelect: true,
+  });
+  canvas.add(polyline);
+
+  // Endpoint dots
+  el.points.forEach(p => {
+    const dot = new fabric.Circle({
+      left: p.x, top: p.y, radius: 3,
+      fill: ELEMENT_COLOR, stroke: '#fff', strokeWidth: 1,
+      originX: 'center', originY: 'center',
+      selectable: false, evented: false,
+      _elementId: el.id, _elementType: 'line', _noSelect: true,
+    });
+    canvas.add(dot);
+  });
+
+  // Label at midpoint
+  const mid = el.points[Math.floor(el.points.length / 2)];
+  const text = new fabric.Text(el.label, {
+    left: mid.x + 6, top: mid.y - LABEL_FONT_SIZE / 2,
+    fontSize: LABEL_FONT_SIZE,
+    fontFamily: 'DM Sans, sans-serif',
+    fontWeight: '600',
+    fill: '#2d2d2d',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    padding: 2,
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'line', _noSelect: true,
+  });
+  canvas.add(text);
+  canvas.renderAll();
+}
+
+// =========================================================
+// AREA TOOL
+// =========================================================
+function handleAreaClick(pos) {
+  state.areaPoints.push(pos);
+
+  // Remove old preview
+  if (state.drawingPolygon) { canvas.remove(state.drawingPolygon); state.drawingPolygon = null; }
+
+  if (state.areaPoints.length >= 3) {
+    state.drawingPolygon = new fabric.Polygon(state.areaPoints.map(p => ({ x: p.x, y: p.y })), {
+      stroke: ELEMENT_COLOR,
+      strokeWidth: LINE_WIDTH,
+      fill: 'rgba(230,81,0,0.15)',
+      selectable: false, evented: false,
+      _tempDraw: true,
+    });
+    canvas.add(state.drawingPolygon);
+    _finishBtn.classList.add('visible');
+  } else if (state.areaPoints.length === 2) {
+    state.drawingPolygon = new fabric.Polyline(state.areaPoints.map(p => ({ x: p.x, y: p.y })), {
+      stroke: ELEMENT_COLOR,
+      strokeWidth: LINE_WIDTH,
+      fill: 'transparent',
+      selectable: false, evented: false,
+      _tempDraw: true,
+    });
+    canvas.add(state.drawingPolygon);
+  }
+
+  // Dot
+  const dot = new fabric.Circle({
+    left: pos.x, top: pos.y, radius: 3,
+    fill: ELEMENT_COLOR, originX: 'center', originY: 'center',
+    selectable: false, evented: false, _tempDraw: true,
+  });
+  canvas.add(dot);
+  canvas.renderAll();
+}
+
+function finishArea() {
+  if (state.areaPoints.length < 3) return;
+  const points = state.areaPoints.map(p => ({ x: p.x, y: p.y }));
+  clearTempDrawing();
+
+  const id = ++elementId;
+  const bodyHTML = `<input id="_el-label" type="text" placeholder="z.B. Pflasterflache, Gebaude" value="" />`;
+  createModal('Flache benennen', bodyHTML, () => {
+    const label = document.getElementById('_el-label').value.trim() || ('F' + id);
+    const el = { id, type: 'area', label, points };
+    elements.push(el);
+    renderAreaElement(el);
+    saveSnapshot();
+    updateElementDrawer();
+  }, () => { elementId--; });
+}
+
+function renderAreaElement(el) {
+  const polygon = new fabric.Polygon(el.points, {
+    stroke: ELEMENT_COLOR,
+    strokeWidth: LINE_WIDTH,
+    fill: 'rgba(230,81,0,0.12)',
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'area', _noSelect: true,
+  });
+  canvas.add(polygon);
+
+  // Vertex dots
+  el.points.forEach(p => {
+    const dot = new fabric.Circle({
+      left: p.x, top: p.y, radius: 3,
+      fill: ELEMENT_COLOR, stroke: '#fff', strokeWidth: 1,
+      originX: 'center', originY: 'center',
+      selectable: false, evented: false,
+      _elementId: el.id, _elementType: 'area', _noSelect: true,
+    });
+    canvas.add(dot);
+  });
+
+  // Centered label
+  const cx = el.points.reduce((s, p) => s + p.x, 0) / el.points.length;
+  const cy = el.points.reduce((s, p) => s + p.y, 0) / el.points.length;
+  const text = new fabric.Text(el.label, {
+    left: cx, top: cy,
+    originX: 'center', originY: 'center',
+    fontSize: LABEL_FONT_SIZE,
+    fontFamily: 'DM Sans, sans-serif',
+    fontWeight: '600',
+    fill: '#2d2d2d',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    padding: 3,
+    selectable: false, evented: false,
+    _elementId: el.id, _elementType: 'area', _noSelect: true,
+  });
+  canvas.add(text);
+  canvas.renderAll();
+}
+
+// =========================================================
+// MEASURE TOOL — Element Hit Detection
+// =========================================================
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function elementDistFromPoint(el, px, py) {
+  if (el.type === 'point') {
+    return Math.hypot(px - el.position.x, py - el.position.y);
+  }
+  const pts = el.points;
+  let minDist = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    minDist = Math.min(minDist, distToSegment(px, py, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y));
+  }
+  if (el.type === 'area' && pts.length >= 3) {
+    // Also check closing edge
+    minDist = Math.min(minDist, distToSegment(px, py, pts[pts.length - 1].x, pts[pts.length - 1].y, pts[0].x, pts[0].y));
+  }
+  return minDist;
+}
+
+function findNearestElement(px, py) {
+  const threshold = 30 / canvas.getZoom();
+  let best = null, bestDist = Infinity;
+  elements.forEach(el => {
+    const d = elementDistFromPoint(el, px, py);
+    if (d < threshold && d < bestDist) {
+      best = el;
+      bestDist = d;
+    }
+  });
+  return best;
+}
+
+// =========================================================
+// MEASURE TOOL — Workflow
+// =========================================================
+function handleMeasureClick(pos) {
+  const el = findNearestElement(pos.x, pos.y);
+  if (!el) {
+    showToast('Kein Element in der Nahe', 'warning');
+    return;
+  }
+
+  if (state.measureStep === 0) {
+    // First element selected
+    state.measureFromId = el.id;
+    state.measureStep = 1;
+    highlightElement(el.id, '#2196F3');
+    showStatus('Tippe auf Element B');
+    haptic('light');
+  } else if (state.measureStep === 1) {
+    if (el.id === state.measureFromId) {
+      showToast('Wahle ein anderes Element', 'warning');
+      return;
+    }
+    // Second element selected
+    const fromEl = elements.find(e => e.id === state.measureFromId);
+    const toEl = el;
+    highlightElement(toEl.id, '#2196F3');
+    haptic('medium');
+
+    // Check if perpendicular is possible
+    const canPerp = (fromEl.type === 'line' && toEl.type === 'point') || (fromEl.type === 'point' && toEl.type === 'line');
+
+    let perpHTML = '';
+    if (canPerp) {
+      perpHTML = `<label style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:13px;color:#636366;">
+        <input type="checkbox" id="_meas-perp" /> Lotrecht (rechtwinklig)
+      </label>`;
+    }
+
+    const bodyHTML = `
+      <p style="margin-bottom:8px;">${fromEl.label} &harr; ${toEl.label}</p>
+      <input id="_meas-value" type="text" inputmode="decimal" placeholder="Abstand in Metern (z.B. 3,40)" />
+      ${perpHTML}`;
+
+    createModal('Abstand eingeben', bodyHTML, () => {
+      const rawVal = document.getElementById('_meas-value').value.replace(',', '.');
+      const value_m = parseFloat(rawVal);
+      if (!value_m || value_m <= 0) {
+        showToast('Bitte einen gultigen Wert eingeben', 'error');
+        resetMeasure();
+        return;
+      }
+      const isPerp = canPerp && document.getElementById('_meas-perp')?.checked;
+      const m = {
+        id: ++measurementId,
+        fromId: fromEl.id,
+        toId: toEl.id,
+        value_m,
+        type: isPerp ? 'perpendicular' : 'distance',
+      };
+      measurements.push(m);
+      renderMeasurement(m);
+      saveSnapshot();
+      updateElementDrawer();
+      resetMeasure();
+      showToast(value_m.toFixed(2).replace('.', ',') + ' m erfasst', 'success');
+    }, () => {
+      resetMeasure();
+    }, 'Speichern');
+
+    // Focus the input
+    setTimeout(() => {
+      const inp = document.getElementById('_meas-value');
+      if (inp) inp.focus();
+    }, 100);
+  }
+}
+
+function resetMeasure() {
+  // Remove highlights
+  canvas.getObjects().forEach(o => { if (o._highlightGlow) { canvas.remove(o); } });
+  state.measureStep = 0;
+  state.measureFromId = null;
+  showStatus('Tippe auf Element A');
+  canvas.renderAll();
+}
+
+function highlightElement(elId, color) {
+  const el = elements.find(e => e.id === elId);
+  if (!el) return;
+  if (el.type === 'point') {
+    const glow = new fabric.Circle({
+      left: el.position.x, top: el.position.y,
+      radius: MARKER_RADIUS + 6,
+      fill: 'transparent', stroke: color, strokeWidth: 3,
+      originX: 'center', originY: 'center',
+      selectable: false, evented: false,
+      _highlightGlow: true,
+    });
+    canvas.add(glow);
+  } else {
+    const pts = el.points;
+    const Cls = el.type === 'area' ? fabric.Polygon : fabric.Polyline;
+    const glow = new Cls(pts.map(p => ({ x: p.x, y: p.y })), {
+      stroke: color, strokeWidth: LINE_WIDTH + 3,
+      fill: 'transparent',
+      selectable: false, evented: false,
+      _highlightGlow: true,
+    });
+    canvas.add(glow);
+    canvas.sendToBack(glow);
+    if (state.backgroundImage) canvas.sendToBack(state.backgroundImage);
+  }
+  canvas.renderAll();
+}
+
+// =========================================================
+// MEASURE — Rendering
+// =========================================================
+function getElementCenter(el) {
+  if (el.type === 'point') return { x: el.position.x, y: el.position.y };
+  const pts = el.points;
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  return { x: cx, y: cy };
+}
+
+function nearestPointOnPolyline(pts, px, py, closed) {
+  let minD = Infinity, nearest = { x: pts[0].x, y: pts[0].y };
+  const n = closed ? pts.length : pts.length - 1;
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq < 1e-9 ? 0 : ((px - a.x) * dx + (py - a.y) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    const d = Math.hypot(px - cx, py - cy);
+    if (d < minD) { minD = d; nearest = { x: cx, y: cy }; }
+  }
+  return nearest;
+}
+
+function renderMeasurement(m) {
+  const fromEl = elements.find(e => e.id === m.fromId);
+  const toEl = elements.find(e => e.id === m.toId);
+  if (!fromEl || !toEl) return;
+
+  let p1, p2;
+
+  if (m.type === 'perpendicular') {
+    // One is a line, one is a point
+    const lineEl = fromEl.type === 'line' ? fromEl : toEl;
+    const pointEl = fromEl.type === 'point' ? fromEl : toEl;
+    const foot = nearestPointOnPolyline(lineEl.points, pointEl.position.x, pointEl.position.y, false);
+    p1 = { x: pointEl.position.x, y: pointEl.position.y };
+    p2 = foot;
+  } else {
+    // Connect centers or nearest points
+    p1 = getElementCenter(fromEl);
+    p2 = getElementCenter(toEl);
+
+    // For lines/areas, use nearest point to the other center
+    if (fromEl.type !== 'point') {
+      p1 = nearestPointOnPolyline(fromEl.points, p2.x, p2.y, fromEl.type === 'area');
+    }
+    if (toEl.type !== 'point') {
+      p2 = nearestPointOnPolyline(toEl.points, p1.x, p1.y, toEl.type === 'area');
+    }
+    // Refine: use the new endpoints
+    if (fromEl.type !== 'point') {
+      p1 = nearestPointOnPolyline(fromEl.points, p2.x, p2.y, fromEl.type === 'area');
+    }
+  }
+
+  // Dashed line
+  const line = new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
+    stroke: MEASURE_COLOR,
+    strokeWidth: 1.5,
+    strokeDashArray: [6, 4],
+    selectable: false, evented: false,
+    _measurementId: m.id, _noSelect: true,
+  });
+  canvas.add(line);
+
+  // Value label
+  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+  const valueText = m.value_m.toFixed(2).replace('.', ',') + ' m';
+  const text = new fabric.Text(valueText, {
+    left: mx, top: my - 8,
+    originX: 'center',
+    fontSize: 11,
+    fontFamily: 'DM Sans, sans-serif',
+    fontWeight: '700',
+    fill: '#333',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    padding: 3,
+    selectable: false, evented: false,
+    _measurementId: m.id, _noSelect: true,
+  });
+  canvas.add(text);
+
+  // Perpendicular right-angle marker
+  if (m.type === 'perpendicular') {
+    const sz = 8;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 1) {
+      const nx = dx / len, ny = dy / len;
+      const px = -ny, py = nx;
+      const corner = [
+        { x: p2.x - nx * sz, y: p2.y - ny * sz },
+        { x: p2.x - nx * sz + px * sz, y: p2.y - ny * sz + py * sz },
+        { x: p2.x + px * sz, y: p2.y + py * sz },
+      ];
+      const mark = new fabric.Polyline(corner, {
+        stroke: MEASURE_COLOR, strokeWidth: 1, fill: 'transparent',
+        selectable: false, evented: false,
+        _measurementId: m.id, _noSelect: true,
+      });
+      canvas.add(mark);
+    }
+  }
+
+  canvas.renderAll();
+}
+
+// =========================================================
+// CANVAS EVENTS (Desktop)
+// =========================================================
+canvas.on('mouse:down', opt => {
+  if (_isTouchDevice) return;
+  if (!state.backgroundImage) return;
+
+  const e = opt.e;
+  if (state.spacePan || e.button === 1) {
+    state.panning = true;
+    state.lastPan = { x: e.clientX, y: e.clientY };
+    canvas.defaultCursor = 'grabbing';
+    return;
+  }
+  if (e.button !== 0) return;
+
+  const p = canvas.getPointer(e);
+  const snapped = snapToPixel(p);
+
+  switch (state.tool) {
+    case 'point': placePoint(snapped); break;
+    case 'line': handleLineClick(snapped); break;
+    case 'area': handleAreaClick(snapped); break;
+    case 'measure': handleMeasureClick(snapped); break;
+    case 'select': handleSelectClick(snapped, opt); break;
+  }
+});
+
+// =========================================================
+// SELECT TOOL
+// =========================================================
+function handleSelectClick(pos, opt) {
+  const el = findNearestElement(pos.x, pos.y);
+  clearSelection();
+  if (!el) return;
+  state.selectedElementId = el.id;
+  // Highlight
+  canvas.getObjects().filter(o => o._elementId === el.id).forEach(o => {
+    o.set({ shadow: new fabric.Shadow({ color: '#2196F3', blur: 10 }) });
+  });
+  canvas.renderAll();
+}
+
+// Double-click to edit label
+canvas.on('mouse:dblclick', opt => {
+  if (state.tool !== 'select') return;
+  const p = canvas.getPointer(opt.e);
+  const el = findNearestElement(p.x, p.y);
+  if (el) editElementLabel(el);
+});
+
+function editElementLabel(el) {
+  const bodyHTML = `<input id="_el-label" type="text" value="${el.label}" />`;
+  createModal('Label bearbeiten', bodyHTML, () => {
+    const newLabel = document.getElementById('_el-label').value.trim();
+    if (newLabel && newLabel !== el.label) {
+      el.label = newLabel;
+      // Re-render: remove old objects and re-render
+      canvas.getObjects().filter(o => o._elementId === el.id).forEach(o => canvas.remove(o));
+      if (el.type === 'point') renderPointElement(el);
+      else if (el.type === 'line') renderLineElement(el);
+      else if (el.type === 'area') renderAreaElement(el);
+      saveSnapshot();
+      updateElementDrawer();
+    }
+  });
+}
+
+// =========================================================
+// DELETE ELEMENT
+// =========================================================
+function deleteElement(elId) {
+  // Remove canvas objects
+  canvas.getObjects().filter(o => o._elementId === elId).forEach(o => canvas.remove(o));
+  // Remove measurements involving this element
+  const relatedMeas = measurements.filter(m => m.fromId === elId || m.toId === elId);
+  relatedMeas.forEach(m => {
+    canvas.getObjects().filter(o => o._measurementId === m.id).forEach(o => canvas.remove(o));
+  });
+  // Remove from arrays
+  const idx = elements.findIndex(e => e.id === elId);
+  if (idx >= 0) elements.splice(idx, 1);
+  for (let i = measurements.length - 1; i >= 0; i--) {
+    if (measurements[i].fromId === elId || measurements[i].toId === elId) measurements.splice(i, 1);
+  }
+  canvas.renderAll();
+  saveSnapshot();
+  updateElementDrawer();
+}
+
+// =========================================================
+// DELETE MEASUREMENT
+// =========================================================
+function deleteMeasurement(mId) {
+  canvas.getObjects().filter(o => o._measurementId === mId).forEach(o => canvas.remove(o));
+  const idx = measurements.findIndex(m => m.id === mId);
+  if (idx >= 0) measurements.splice(idx, 1);
+  canvas.renderAll();
+  saveSnapshot();
+  updateElementDrawer();
+}
+
+// =========================================================
+// ELEMENT DRAWER
+// =========================================================
+function updateElementDrawer() {
+  const drawer = document.getElementById('element-drawer');
+  if (elements.length === 0 && measurements.length === 0) {
+    drawer.classList.remove('visible');
+    return;
+  }
+
+  const typeIcons = { point: '\u{1F4CD}', line: '\u{1F4CF}', area: '\u2B1C' };
+  const typeLabels = { point: 'Punkt', line: 'Linie', area: 'Flache' };
+
+  let html = '<div class="drawer-title"><span>Elemente (' + elements.length + ')</span><button onclick="document.getElementById(\'element-drawer\').classList.remove(\'visible\')" style="font-size:18px;padding:2px 8px;">&times;</button></div>';
+
+  elements.forEach(el => {
+    html += `<div class="el-item">
+      <div class="el-icon">${typeIcons[el.type] || '?'}</div>
+      <div>
+        <div class="el-label">${el.label}</div>
+        <div class="el-type">${typeLabels[el.type]}</div>
+      </div>
+      <button class="el-delete" onclick="deleteElement(${el.id})">&#10005;</button>
+    </div>`;
+  });
+
+  if (measurements.length > 0) {
+    html += '<div class="drawer-title" style="margin-top:12px;"><span>Messungen (' + measurements.length + ')</span></div>';
+    measurements.forEach(m => {
+      const from = elements.find(e => e.id === m.fromId);
+      const to = elements.find(e => e.id === m.toId);
+      const fromLabel = from ? from.label : '?';
+      const toLabel = to ? to.label : '?';
+      const typeStr = m.type === 'perpendicular' ? ' (lotrecht)' : '';
+      html += `<div class="meas-item">
+        <span>${fromLabel} &harr; ${toLabel}${typeStr}</span>
+        <span class="meas-value">${m.value_m.toFixed(2).replace('.', ',')} m</span>
+        <button class="el-delete" onclick="deleteMeasurement(${m.id})">&#10005;</button>
+      </div>`;
+    });
+  }
+
+  drawer.innerHTML = html;
+}
+
+// =========================================================
+// EXPORT — Feldaufnahme JSON for Planer
+// =========================================================
+function exportFeldaufnahme() {
+  if (elements.length === 0) {
+    showToast('Keine Elemente zum Exportieren', 'warning');
+    return;
+  }
+  const img = state.backgroundImage;
+  const s = state.imgDisplayScale;
+  const offX = img ? img.left : 0;
+  const offY = img ? img.top : 0;
+
+  // Normalize coordinates to original image pixels
+  const normPos = p => ({ x: (p.x - offX) / s, y: (p.y - offY) / s });
+
+  const data = {
+    version: 1,
+    type: 'feldaufnahme',
+    exportDate: new Date().toISOString(),
+    backgroundInfo: state.backgroundInfo,
+    elements: elements.map(el => {
+      const base = { id: el.id, type: el.type, label: el.label };
+      if (el.type === 'point') base.position = normPos(el.position);
+      else base.points = el.points.map(normPos);
+      return base;
+    }),
+    measurements: measurements.map(m => ({
+      fromId: m.fromId,
+      toId: m.toId,
+      value_m: m.value_m,
+      type: m.type,
+    })),
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const file = new File([blob], 'feldaufnahme-' + new Date().toISOString().slice(0, 10) + '.json', { type: 'application/json' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Feldaufnahme' }).catch(() => {});
+  } else {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  showToast(elements.length + ' Element(e) exportiert', 'success');
+}
+
+// =========================================================
+// SAVE / LOAD PROJECT (within Feldaufnahme)
+// =========================================================
+function saveProject() {
+  const json = canvas.toJSON(CANVAS_SERIAL_PROPS);
+  json.objects = (json.objects || []).filter(o => !o._isBackground);
+
+  const data = {
+    version: 1,
+    type: 'feldaufnahme-project',
+    saveDate: new Date().toISOString(),
+    backgroundInfo: state.backgroundInfo,
+    imgDisplayScale: state.imgDisplayScale,
+    canvas: json,
+    elements: elements,
+    measurements: measurements,
+    elementId: elementId,
+    measurementId: measurementId,
+  };
+
+  // Also save background image as data URL
+  if (state.backgroundImage) {
+    try { data.backgroundDataUrl = state.backgroundImage.toDataURL(); } catch (e) { /* cross-origin */ }
+  }
+
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const file = new File([blob], 'feldaufnahme-projekt.json', { type: 'application/json' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Feldaufnahme Projekt' }).catch(() => {});
+  } else {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = file.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+  showToast('Projekt gespeichert', 'success');
+}
+
+function loadProject(data) {
+  if (!data || data.type !== 'feldaufnahme-project') {
+    showToast('Keine gultige Projektdatei', 'error');
+    return;
+  }
+
+  const restore = () => {
+    history._paused = true;
+    canvas.loadFromJSON(data.canvas, () => {
+      if (state.backgroundImage) { canvas.add(state.backgroundImage); canvas.sendToBack(state.backgroundImage); }
+      elements.length = 0;
+      (data.elements || []).forEach(e => elements.push(e));
+      measurements.length = 0;
+      (data.measurements || []).forEach(m => measurements.push(m));
+      elementId = data.elementId || 0;
+      measurementId = data.measurementId || 0;
+      state.backgroundInfo = data.backgroundInfo;
+      state.imgDisplayScale = data.imgDisplayScale || 1;
+      document.getElementById('drop-overlay').classList.add('hidden');
+      canvas.renderAll();
+      history._paused = false;
+      history.past = []; history.future = [];
+      updateUndoBtn();
+      updateElementDrawer();
+      showToast('Projekt geladen', 'success');
+    });
+  };
+
+  if (data.backgroundDataUrl) {
+    fabric.Image.fromURL(data.backgroundDataUrl, img => {
+      const s = data.imgDisplayScale || 1;
+      img.scale(s);
+      img.set({
+        left: (canvas.width - img.width * s) / 2,
+        top: (canvas.height - img.height * s) / 2,
+        selectable: false, evented: false, hasBorders: false, hasControls: false,
+        _noSelect: true, _isBackground: true,
+      });
+      state.backgroundImage = img;
+      restore();
+    });
+  } else {
+    state.backgroundImage = null;
+    restore();
+  }
+}
+
+document.getElementById('btn-save').onclick = saveProject;
+document.getElementById('btn-export').onclick = exportFeldaufnahme;
+document.getElementById('btn-load-project').onclick = () => document.getElementById('project-input').click();
+document.getElementById('project-input').onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      loadProject(data);
+    } catch (err) {
+      showToast('Datei konnte nicht geladen werden', 'error');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+};
+
+// =========================================================
+// MOBILE: Canvas resize
+// =========================================================
+if (_isTouchDevice) {
+  requestAnimationFrame(() => {
+    canvas.setWidth(wrapper.clientWidth);
+    canvas.setHeight(wrapper.clientHeight);
+    canvas.renderAll();
+  });
+}
+
+// =========================================================
+// MOBILE: BOTTOM TOOLBAR
+// =========================================================
+if (_isTouchDevice) {
+  const _ttToolMap = {
+    'tt-select': 'select',
+    'tt-point': 'point',
+    'tt-line': 'line',
+    'tt-area': 'area',
+    'tt-measure': 'measure',
+  };
+  Object.entries(_ttToolMap).forEach(([btnId, tool]) => {
+    const btn = document.getElementById(btnId);
+    if (btn) btn.onclick = () => setTool(tool);
+  });
+
+  document.getElementById('tt-undo').onclick = () => undo();
+}
+
+// =========================================================
+// MOBILE: THREE-DOT MENU
+// =========================================================
+function openMobileMenu() {
+  document.getElementById('mobile-menu-backdrop').classList.add('visible');
+  requestAnimationFrame(() => document.getElementById('mobile-menu').classList.add('visible'));
+}
+function closeMobileMenu() {
+  document.getElementById('mobile-menu').classList.remove('visible');
+  setTimeout(() => document.getElementById('mobile-menu-backdrop').classList.remove('visible'), 250);
+}
+
+document.getElementById('tt-more').onclick = openMobileMenu;
+document.getElementById('mobile-menu-backdrop').onclick = closeMobileMenu;
+document.getElementById('mm-upload').onclick = () => { closeMobileMenu(); document.getElementById('file-input').click(); };
+document.getElementById('mm-save').onclick = () => { closeMobileMenu(); saveProject(); };
+document.getElementById('mm-load').onclick = () => { closeMobileMenu(); document.getElementById('project-input').click(); };
+document.getElementById('mm-export').onclick = () => { closeMobileMenu(); exportFeldaufnahme(); };
+document.getElementById('mm-undo').onclick = () => { closeMobileMenu(); undo(); };
+document.getElementById('mm-redo').onclick = () => { closeMobileMenu(); redo(); };
+document.getElementById('mm-list').onclick = () => {
+  closeMobileMenu();
+  const drawer = document.getElementById('element-drawer');
+  updateElementDrawer();
+  drawer.classList.toggle('visible');
+};
+document.getElementById('mm-clear').onclick = () => {
+  closeMobileMenu();
+  createModal('Alles loschen?', '<p>Alle Elemente und Messungen werden geloscht.</p>', () => {
+    canvas.getObjects().filter(o => !o._isBackground).forEach(o => canvas.remove(o));
+    elements.length = 0;
+    measurements.length = 0;
+    elementId = 0;
+    measurementId = 0;
+    saveSnapshot();
+    updateElementDrawer();
+    showToast('Alles geloscht', 'info');
+  });
+};
+
+// =========================================================
+// MOBILE: FINISH BUTTON
+// =========================================================
+const _finishBtn = document.getElementById('mobile-finish-btn');
+
+function _updateFinishBtn() {
+  if (!_isTouchDevice) return;
+  const showFinish =
+    (state.tool === 'line' && state.linePoints.length >= 2) ||
+    (state.tool === 'area' && state.areaPoints.length >= 3);
+  if (showFinish) _finishBtn.classList.add('visible');
+  else _finishBtn.classList.remove('visible');
+}
+
+if (_isTouchDevice) {
+  _finishBtn.addEventListener('click', () => {
+    if (state.tool === 'line' && state.linePoints.length >= 2) finishLine();
+    else if (state.tool === 'area' && state.areaPoints.length >= 3) finishArea();
+    _finishBtn.classList.remove('visible');
+    _mobileMag.hide();
+    _hideMobileCrosshair();
+  });
+}
+
+// =========================================================
+// MOBILE MAGNIFIER
+// =========================================================
+const _mobileMag = (() => {
+  if (!_isTouchDevice) return { show() {}, hide() {}, updateStart() {}, updateEnd() {}, hideStart() {}, hideEnd() {}, active: false };
+
+  const SIZE = 130, ZOOM = 4;
+  const dpr = () => window.devicePixelRatio || 1;
+
+  function createMagCanvas(container) {
+    const c = document.createElement('canvas');
+    container.insertBefore(c, container.firstChild);
+    const d = dpr();
+    c.width = SIZE * d; c.height = SIZE * d;
+    c.style.width = SIZE + 'px'; c.style.height = SIZE + 'px';
+    return { canvas: c, ctx: c.getContext('2d') };
+  }
+
+  const startEl = document.getElementById('mobile-mag-start');
+  const endEl = document.getElementById('mobile-mag-end');
+  const startMag = createMagCanvas(startEl);
+  const endMag = createMagCanvas(endEl);
+
+  function renderMag(mag, canvasX, canvasY, color) {
+    const d = dpr();
+    const ctx = mag.ctx;
+    const c = mag.canvas;
+    if (c.width !== SIZE * d) {
+      c.width = SIZE * d; c.height = SIZE * d;
+      c.style.width = SIZE + 'px'; c.style.height = SIZE + 'px';
+    }
+    const vpt = canvas.viewportTransform;
+    const screenX = canvasX * vpt[0] + vpt[4];
+    const screenY = canvasY * vpt[3] + vpt[5];
+    const cpx = screenX * d, cpy = screenY * d;
+    const srcW = (SIZE / ZOOM) * d, srcH = (SIZE / ZOOM) * d;
+    const srcX = cpx - srcW / 2, srcY = cpy - srcH / 2;
+    ctx.clearRect(0, 0, SIZE * d, SIZE * d);
+    try { ctx.drawImage(canvas.lowerCanvasEl, srcX, srcY, srcW, srcH, 0, 0, SIZE * d, SIZE * d); } catch(_) {}
+    ctx.save();
+    ctx.scale(d, d);
+    const h = SIZE / 2, GAP = 6;
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.beginPath(); ctx.arc(h, h, GAP + 1, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = color || 'rgba(210,30,30,0.92)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 3]);
+    ctx.beginPath(); ctx.moveTo(0, h); ctx.lineTo(h - GAP, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h + GAP, h); ctx.lineTo(SIZE, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h, 0); ctx.lineTo(h, h - GAP); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(h, h + GAP); ctx.lineTo(h, SIZE); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = color || 'rgba(210,30,30,1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(h, h, 2.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  let _active = false;
+  return {
+    get active() { return _active; },
+    updateStart(x, y, c) { startEl.classList.add('visible'); _active = true; renderMag(startMag, x, y, c); },
+    updateEnd(x, y, c) { endEl.classList.add('visible'); _active = true; renderMag(endMag, x, y, c); },
+    hideStart() { startEl.classList.remove('visible'); },
+    hideEnd() { endEl.classList.remove('visible'); },
+    show() { _active = true; },
+    hide() { _active = false; startEl.classList.remove('visible'); endEl.classList.remove('visible'); },
+  };
+})();
+
+// =========================================================
+// MOBILE CROSSHAIR
+// =========================================================
+const _crosshairEl = document.getElementById('mobile-crosshair');
+function _showMobileCrosshair(clientX, clientY) {
+  _crosshairEl.style.left = clientX + 'px';
+  _crosshairEl.style.top = clientY + 'px';
+  _crosshairEl.classList.add('visible');
+}
+function _hideMobileCrosshair() {
+  _crosshairEl.classList.remove('visible');
+}
+
+// =========================================================
+// MOBILE: TOUCH STATE MACHINE
+// =========================================================
+let _touchState = { type: null, lastDist: 0, lastMid: null, startTime: 0 };
+const _PINCH_COOLDOWN_MS = 350;
+let _pinchCooldownUntil = 0;
+let _touchSuppressClick = false;
+let _mobileAdjust = { active: false, lastCanvasPos: null };
+
+function _getCanvasPtrFromTouch(touch) {
+  return canvas.getPointer({
+    clientX: touch.clientX, clientY: touch.clientY,
+    pageX: touch.pageX, pageY: touch.pageY,
+  });
+}
+
+function _touchOnOverlay(e) {
+  const overlay = document.getElementById('drop-overlay');
+  return overlay && !overlay.classList.contains('hidden') && overlay.contains(e.target);
+}
+
+// Prevent iOS bounce/zoom
+wrapper.addEventListener('touchmove', e => {
+  if (_touchOnOverlay(e)) return;
+  if (e.touches.length >= 2 || state.tool !== 'select') {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+function _updateMobileMagnifiers(p) {
+  const col = 'rgba(230,81,0,0.92)';
+  let hasStart = false;
+
+  if (state.tool === 'line' && state.linePoints.length >= 1) {
+    const last = state.linePoints[state.linePoints.length - 1];
+    _mobileMag.updateStart(last.x, last.y, col);
+    hasStart = true;
+  } else if (state.tool === 'area' && state.areaPoints.length >= 1) {
+    const last = state.areaPoints[state.areaPoints.length - 1];
+    _mobileMag.updateStart(last.x, last.y, col);
+    hasStart = true;
+  }
+
+  if (hasStart) {
+    _mobileMag.updateEnd(p.x, p.y, col);
+  } else {
+    _mobileMag.updateStart(p.x, p.y, col);
+    _mobileMag.hideEnd();
+  }
+}
+
+if (_isTouchDevice) {
+  const DRAWING_TOOLS = ['point', 'line', 'area'];
+
+  // Capture phase: intercept touch BEFORE Fabric.js
+  canvas.upperCanvasEl.addEventListener('touchstart', e => {
+    if (!DRAWING_TOOLS.includes(state.tool)) return;
+    if (!state.backgroundImage) return;
+    if (e.touches.length !== 1) return;
+    if (Date.now() < _pinchCooldownUntil) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    _touchSuppressClick = true;
+    _mobileAdjust.active = true;
+
+    const touch = e.touches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    _mobileAdjust.lastCanvasPos = p;
+
+    _showMobileCrosshair(touch.clientX, touch.clientY);
+    _updateMobileMagnifiers(p);
+  }, { capture: true, passive: false });
+
+  canvas.upperCanvasEl.addEventListener('touchmove', e => {
+    if (!_mobileAdjust.active || e.touches.length !== 1) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const touch = e.touches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    _mobileAdjust.lastCanvasPos = p;
+
+    _showMobileCrosshair(touch.clientX, touch.clientY);
+
+    const snapped = snapToPixel(p);
+
+    // Update preview for line tool
+    if (state.tool === 'line' && state.linePoints.length >= 1 && state.drawingLine) {
+      const pts = state.linePoints.map(pp => ({ x: pp.x, y: pp.y }));
+      pts.push(snapped);
+      canvas.remove(state.drawingLine);
+      state.drawingLine = new fabric.Polyline(pts, {
+        stroke: ELEMENT_COLOR, strokeWidth: LINE_WIDTH, fill: 'transparent',
+        selectable: false, evented: false, _tempDraw: true,
+      });
+      canvas.add(state.drawingLine);
+    }
+
+    // Update preview for area tool
+    if (state.tool === 'area' && state.areaPoints.length >= 1) {
+      if (state.drawingPolygon) canvas.remove(state.drawingPolygon);
+      const pts = [...state.areaPoints, snapped];
+      if (pts.length >= 3) {
+        state.drawingPolygon = new fabric.Polygon(pts.map(pp => ({ x: pp.x, y: pp.y })), {
+          stroke: ELEMENT_COLOR, strokeWidth: LINE_WIDTH, fill: 'rgba(230,81,0,0.15)',
+          selectable: false, evented: false, _tempDraw: true,
+        });
+      } else {
+        state.drawingPolygon = new fabric.Polyline(pts.map(pp => ({ x: pp.x, y: pp.y })), {
+          stroke: ELEMENT_COLOR, strokeWidth: LINE_WIDTH, fill: 'transparent',
+          selectable: false, evented: false, _tempDraw: true,
+        });
+      }
+      canvas.add(state.drawingPolygon);
+    }
+
+    _updateMobileMagnifiers(snapped);
+    throttledRender();
+  }, { capture: true, passive: false });
+
+  canvas.upperCanvasEl.addEventListener('touchend', e => {
+    if (!_mobileAdjust.active) return;
+    e.stopImmediatePropagation();
+
+    _mobileAdjust.active = false;
+    _touchSuppressClick = false;
+    _hideMobileCrosshair();
+    haptic('light');
+
+    const touch = e.changedTouches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    const snapped = snapToPixel(p);
+
+    switch (state.tool) {
+      case 'point': placePoint(snapped); break;
+      case 'line': handleLineClick(snapped); break;
+      case 'area': handleAreaClick(snapped); break;
+    }
+
+    _updateFinishBtn();
+    _updateMobileMagnifiers(snapped);
+
+    // Hide magnifiers when tool cycle is done
+    if (state.tool === 'point') {
+      _mobileMag.hide();
+    }
+  }, { capture: true });
+
+  // Handle measure tool taps on mobile (separate, simpler handler)
+  canvas.upperCanvasEl.addEventListener('touchstart', e => {
+    if (state.tool !== 'measure') return;
+    if (!state.backgroundImage) return;
+    if (e.touches.length !== 1) return;
+    if (Date.now() < _pinchCooldownUntil) return;
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const touch = e.touches[0];
+    const p = _getCanvasPtrFromTouch(touch);
+    const snapped = snapToPixel(p);
+    handleMeasureClick(snapped);
+  }, { capture: true, passive: false });
+
+  // Handle select tool taps on mobile
+  canvas.upperCanvasEl.addEventListener('touchstart', e => {
+    if (state.tool !== 'select') return;
+    if (e.touches.length !== 1) return;
+    if (Date.now() < _pinchCooldownUntil) return;
+    // Don't intercept — let it pass to Fabric for pan in touchmove
+  }, { capture: true, passive: true });
+}
+
+// =========================================================
+// PINCH + PAN (Bubbling phase)
+// =========================================================
+wrapper.addEventListener('touchstart', e => {
+  if (_touchOnOverlay(e)) return;
+
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    _touchSuppressClick = true;
+    if (_mobileAdjust.active) { _mobileAdjust.active = false; _hideMobileCrosshair(); }
+    _touchState.type = 'pinch';
+    _touchState.lastDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    _touchState.lastMid = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+    };
+    return;
+  }
+
+  if (e.touches.length === 1) {
+    if (Date.now() < _pinchCooldownUntil) {
+      _touchSuppressClick = true;
+      _touchState.type = 'cooldown';
+      return;
+    }
+    _touchState.type = 'single';
+    _touchState.startTime = Date.now();
+    _touchState.lastMid = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: false });
+
+wrapper.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && _touchState.type === 'pinch') {
+    e.preventDefault();
+    const dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    const mid = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+    };
+    const factor = dist / _touchState.lastDist;
+    const rect = wrapper.getBoundingClientRect();
+    setZoom(canvas.getZoom() * factor, { x: mid.x - rect.left, y: mid.y - rect.top });
+    const dx = mid.x - _touchState.lastMid.x;
+    const dy = mid.y - _touchState.lastMid.y;
+    const vpt = canvas.viewportTransform.slice();
+    vpt[4] += dx; vpt[5] += dy;
+    canvas.setViewportTransform(vpt);
+    _touchState.lastDist = dist;
+    _touchState.lastMid = mid;
+    return;
+  }
+
+  if (e.touches.length === 1 && _touchState.type === 'single' && state.tool === 'select') {
+    e.preventDefault();
+    const t = e.touches[0];
+    if (_touchState.lastMid) {
+      const dx = t.clientX - _touchState.lastMid.x;
+      const dy = t.clientY - _touchState.lastMid.y;
+      const vpt = canvas.viewportTransform.slice();
+      vpt[4] += dx; vpt[5] += dy;
+      canvas.setViewportTransform(vpt);
+    }
+    _touchState.lastMid = { x: t.clientX, y: t.clientY };
+  }
+}, { passive: false });
+
+wrapper.addEventListener('touchend', e => {
+  if (e.touches.length === 0) {
+    if (_touchState.type === 'pinch') {
+      _pinchCooldownUntil = Date.now() + _PINCH_COOLDOWN_MS;
+      _touchSuppressClick = true;
+    }
+    _touchState.type = null;
+    _touchState.lastMid = null;
+  }
+}, { passive: true });
+
+// =========================================================
+// ORIENTATION CHANGE
+// =========================================================
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    canvas.setWidth(wrapper.clientWidth);
+    canvas.setHeight(wrapper.clientHeight);
+    canvas.renderAll();
+  }, 200);
+});
+
+// Prevent double-tap zoom
+document.addEventListener('dblclick', e => {
+  if (_isTouchDevice) e.preventDefault();
+}, { passive: false });
+
+// =========================================================
+// INIT: set default tool
+// =========================================================
+setTool('select');
+</script>
+</body>
+</html>
