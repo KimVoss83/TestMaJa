@@ -1028,6 +1028,12 @@ document.addEventListener('keydown', e => {
   if (e.target.matches('input,textarea,select')) return;
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+  // Enter key: finish line drawing
+  if (e.key === 'Enter' && LINE_TOOLS.includes(state.tool) && state.linePoints.length >= 2) {
+    e.preventDefault();
+    const cat = state.tool === 'ref-line' ? 'reference' : 'element';
+    finishLine(cat);
+  }
 });
 
 // =========================================================
@@ -1218,15 +1224,33 @@ function renderElement(el) {
 
     // Endpoint/knickpoint dots
     el.points.forEach((p, i) => {
-      const dot = new fabric.Circle({
-        left: p.x, top: p.y, radius: 3,
-        fill: color, stroke: '#fff', strokeWidth: 1,
-        originX: 'center', originY: 'center',
-        selectable: false, evented: false,
-        _elementId: el.id, _elementType: 'line', _elementCategory: el.category,
-        _knickIndex: i, _noSelect: true,
-      });
-      canvas.add(dot);
+      if (el.category === 'reference') {
+        // Small diamond for reference line knickpoints
+        const sz = 4;
+        const dPts = [
+          { x: p.x, y: p.y - sz },
+          { x: p.x + sz, y: p.y },
+          { x: p.x, y: p.y + sz },
+          { x: p.x - sz, y: p.y },
+        ];
+        const dot = new fabric.Polygon(dPts, {
+          fill: color, stroke: '#fff', strokeWidth: 1,
+          selectable: false, evented: false,
+          _elementId: el.id, _elementType: 'line', _elementCategory: el.category,
+          _knickIndex: i, _noSelect: true,
+        });
+        canvas.add(dot);
+      } else {
+        const dot = new fabric.Circle({
+          left: p.x, top: p.y, radius: 3,
+          fill: color, stroke: '#fff', strokeWidth: 1,
+          originX: 'center', originY: 'center',
+          selectable: false, evented: false,
+          _elementId: el.id, _elementType: 'line', _elementCategory: el.category,
+          _knickIndex: i, _noSelect: true,
+        });
+        canvas.add(dot);
+      }
     });
 
     // Label at midpoint
@@ -1323,47 +1347,37 @@ function finishLine(category) {
 // Returns { element, anchor } or null
 // anchor = { type:'segment', index } | { type:'knick', index }
 function findElementAnchor(pos, categoryFilter) {
-  const z = canvas.getZoom();
-  const threshold = 30 / z;
-  const knickThreshold = threshold * 0.6; // knickpoints have priority with tighter threshold
+  const threshold = 30 / state.zoom;
+  const knickThreshold = threshold * 0.6;
+  let best = null;
 
-  let bestEl = null, bestAnchor = null, bestDist = Infinity;
-
-  elements.forEach(el => {
-    if (categoryFilter && el.category !== categoryFilter) return;
-
+  elements.filter(el => !categoryFilter || el.category === categoryFilter).forEach(el => {
     if (el.type === 'point') {
       const d = Math.hypot(pos.x - el.position.x, pos.y - el.position.y);
-      if (d < threshold && d < bestDist) {
-        bestEl = el;
-        bestAnchor = { type: 'knick', index: 0 };
-        bestDist = d;
+      if (d < threshold && (!best || d < best.dist)) {
+        best = { element: el, anchor: { type: 'point' }, dist: d, pos: el.position };
       }
     } else if (el.type === 'line') {
-      const pts = el.points;
       // Check knickpoints first (higher priority)
-      for (let i = 0; i < pts.length; i++) {
-        const d = Math.hypot(pos.x - pts[i].x, pos.y - pts[i].y);
-        if (d < knickThreshold && d < bestDist) {
-          bestEl = el;
-          bestAnchor = { type: 'knick', index: i };
-          bestDist = d;
+      el.points.forEach((p, i) => {
+        const d = Math.hypot(pos.x - p.x, pos.y - p.y);
+        if (d < knickThreshold && (!best || d < best.dist || best.anchor.type === 'segment')) {
+          best = { element: el, anchor: { type: 'knick', index: i }, dist: d, pos: p };
         }
-      }
-      // Then check segments
-      for (let i = 0; i < pts.length - 1; i++) {
-        const d = distToSegment(pos, pts[i], pts[i + 1]);
-        if (d < threshold && d < bestDist) {
-          bestEl = el;
-          bestAnchor = { type: 'segment', index: i };
-          bestDist = d;
+      });
+      // Only check segments if no knick was found
+      if (!best || best.anchor.type !== 'knick') {
+        for (let i = 0; i < el.points.length - 1; i++) {
+          const d = distToSegment(pos, el.points[i], el.points[i + 1]);
+          if (d < threshold && (!best || d < best.dist)) {
+            const foot = closestPointOnSegment(pos, el.points[i], el.points[i + 1]);
+            best = { element: el, anchor: { type: 'segment', index: i }, dist: d, pos: foot };
+          }
         }
       }
     }
   });
-
-  if (!bestEl) return null;
-  return { element: bestEl, anchor: bestAnchor };
+  return best;
 }
 
 // =========================================================
