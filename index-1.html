@@ -7405,6 +7405,7 @@ function importFeldaufnahme(data) {
         id: id, type: 'pipe', label: label, value: null,
         pipeType: 'FA', pipeDepth: null, refs: Array.from(allRefIds),
         nennweite: null, faConstraints: faConstraints,
+        _faAbsPts: pts.map(p => ({ x: p.x, y: p.y })),
       });
 
 
@@ -7454,42 +7455,27 @@ function importFeldaufnahme(data) {
 
 function applyFaConstraints(meas, movedRefId) {
   if (!meas.faConstraints || meas.faConstraints.length === 0) return;
+  if (!meas._faAbsPts || meas._faAbsPts.length === 0) return;
 
-  const polyline = canvas.getObjects().find(
-    o => o._measureId === meas.id && o.type === 'polyline'
-  );
-  if (!polyline) { console.warn('[FA] No polyline found for meas', meas.id); return; }
-
-  const matrix = polyline.calcTransformMatrix();
-  const absPts = polyline.points.map(pt =>
-    fabric.util.transformPoint(
-      new fabric.Point(pt.x - polyline.pathOffset.x, pt.y - polyline.pathOffset.y),
-      matrix
-    )
-  );
-
-  console.log('[FA] applyFaConstraints meas=', meas.id, 'movedRefId=', movedRefId);
-  console.log('[FA] polyline left/top=', polyline.left, polyline.top, 'pathOffset=', polyline.pathOffset);
-  console.log('[FA] polyline.points raw=', polyline.points.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
-  console.log('[FA] absPts=', absPts.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
-  console.log('[FA] scale=', state.scale, 'imgDisplayScale=', state.imgDisplayScale);
-
-  const newPts = absPts.map(p => ({ x: p.x, y: p.y }));
+  // Read absolute points directly — bypass Fabric.js transform math entirely
+  const newPts = meas._faAbsPts.map(p => ({ x: p.x, y: p.y }));
 
   // Only apply constraints for the moved reference, not all constraints
   const activeConstraints = movedRefId != null
     ? meas.faConstraints.filter(c => c.planerRefId === movedRefId)
     : meas.faConstraints;
 
-  console.log('[FA] activeConstraints=', activeConstraints.length, 'of', meas.faConstraints.length);
+  console.log('[FA] solver: meas=', meas.id, 'pts=', newPts.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),
+    'constraints=', activeConstraints.length, 'scale=', state.scale, 'imgDisplayScale=', state.imgDisplayScale);
 
   activeConstraints.forEach(c => {
     const ref = state.pipeReferences.find(r => r.id === c.planerRefId);
-    if (!ref) { console.warn('[FA] ref not found for planerRefId', c.planerRefId); return; }
+    if (!ref) return;
 
-    if (!state.scale) { console.warn('[FA] no scale set'); return; }
+    if (!state.scale) return;
     const dist_px = c.value_m * state.scale * state.imgDisplayScale;
-    console.log('[FA] constraint:', c.type, 'elAnchor=', c.elementAnchor, 'value_m=', c.value_m, 'dist_px=', Math.round(dist_px), 'ref=', ref.type, ref.type==='line' ? {x1:Math.round(ref.x1),y1:Math.round(ref.y1),x2:Math.round(ref.x2),y2:Math.round(ref.y2)} : {x:Math.round(ref.x),y:Math.round(ref.y)});
+    console.log('[FA]  constraint:', c.type, c.elementAnchor, 'dist_px=', Math.round(dist_px),
+      'ref=', ref.type === 'line' ? {x1:Math.round(ref.x1),y1:Math.round(ref.y1),x2:Math.round(ref.x2),y2:Math.round(ref.y2)} : {x:Math.round(ref.x),y:Math.round(ref.y)});
 
     if (c.type === 'perpendicular' && c.elementAnchor.type === 'segment') {
       const segIdx = c.elementAnchor.index;
@@ -7566,9 +7552,13 @@ function applyFaConstraints(meas, movedRefId) {
 
   console.log('[FA] newPts after constraints=', newPts.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
 
+  // Store updated absolute points back
+  meas._faAbsPts = newPts.map(p => ({ x: p.x, y: p.y }));
+
   // Replace polyline — Fabric.js 5 polyline mutation is fragile (pathOffset/left/top desync).
   // Same approach as updatePipeFromHandles(): remove old, create new.
-  canvas.remove(polyline);
+  const oldPolyline = canvas.getObjects().find(o => o._measureId === meas.id && o.type === 'polyline');
+  if (oldPolyline) canvas.remove(oldPolyline);
   const newPolyline = new fabric.Polyline(newPts.map(p => ({ x: p.x, y: p.y })), {
     fill: 'transparent',
     stroke: '#E65100', strokeWidth: 2.5,
