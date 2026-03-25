@@ -3894,10 +3894,10 @@ canvas.on('object:modified', opt => {
     state.measurements
       .filter(m => m.type === 'pipe' && m.refs?.includes(refId))
       .forEach(m => renderDimLinesForPipe(m.id));
-    // Propagate Feldaufnahme constraints
+    // Propagate Feldaufnahme constraints — only for the moved reference
     state.measurements
       .filter(m => m.faConstraints && m.faConstraints.some(c => c.planerRefId === refId))
-      .forEach(m => applyFaConstraints(m));
+      .forEach(m => applyFaConstraints(m, refId));
   }
   // Wenn ein Rohr verschoben wurde → seine Maßlinien neu berechnen
   if (obj?._measureId != null) {
@@ -7452,7 +7452,7 @@ function importFeldaufnahme(data) {
   showToast('Import: ' + nEl + ' Element(e), ' + nRef + ' Referenz(en), ' + nC + ' Maß(e)', 'success');
 }
 
-function applyFaConstraints(meas) {
+function applyFaConstraints(meas, movedRefId) {
   if (!meas.faConstraints || meas.faConstraints.length === 0) return;
 
   const polyline = canvas.getObjects().find(
@@ -7470,7 +7470,12 @@ function applyFaConstraints(meas) {
 
   const newPts = absPts.map(p => ({ x: p.x, y: p.y }));
 
-  meas.faConstraints.forEach(c => {
+  // Only apply constraints for the moved reference, not all constraints
+  const activeConstraints = movedRefId != null
+    ? meas.faConstraints.filter(c => c.planerRefId === movedRefId)
+    : meas.faConstraints;
+
+  activeConstraints.forEach(c => {
     const ref = state.pipeReferences.find(r => r.id === c.planerRefId);
     if (!ref) return;
 
