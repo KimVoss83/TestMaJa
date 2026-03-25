@@ -7555,18 +7555,20 @@ function applyFaConstraints(meas, movedRefId) {
     }
   });
 
-  // Update polyline with new points (Fabric.js 5.x needs _calcDimensions)
-  // Points are in absolute canvas coords — after _calcDimensions recalculates
-  // pathOffset, we must sync left/top to match, otherwise the transform matrix
-  // still uses the old position and the polyline renders at the wrong place.
-  polyline.points = newPts.map(p => new fabric.Point(p.x, p.y));
-  polyline._calcDimensions();
-  polyline.left = polyline.pathOffset.x;
-  polyline.top = polyline.pathOffset.y;
-  polyline.setCoords();
-  polyline.dirty = true;
+  // Replace polyline — Fabric.js 5 polyline mutation is fragile (pathOffset/left/top desync).
+  // Same approach as updatePipeFromHandles(): remove old, create new.
+  canvas.remove(polyline);
+  const newPolyline = new fabric.Polyline(newPts.map(p => ({ x: p.x, y: p.y })), {
+    fill: 'transparent',
+    stroke: '#E65100', strokeWidth: 2.5,
+    selectable: true, evented: true,
+    _measureId: meas.id, _pipeType: 'FA', _faImported: true,
+    objectCaching: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
+  });
+  canvas.add(newPolyline);
 
-  // Reposition endpoint dots
+  // Replace endpoint dots
   canvas.getObjects()
     .filter(o => o._measureId === meas.id && o.type === 'circle' && o._noSelect)
     .forEach(o => canvas.remove(o));
@@ -7580,7 +7582,9 @@ function applyFaConstraints(meas, movedRefId) {
     tag.setCoords();
   }
 
+  sendPipesToBack();
   renderDimLinesForPipe(meas.id);
+  canvas.renderAll();
 }
 
 document.getElementById('feldaufnahme-import-input').onchange = e => {
