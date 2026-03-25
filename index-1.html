@@ -2595,16 +2595,12 @@ function setTool(t) {
   canvas.defaultCursor = t === 'select' ? 'default' : 'crosshair';
   if (t === 'select') _loupe.hide();
   if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
-  const faRefIds = new Set();
-  state.measurements.forEach(m => {
-    if (m.faConstraints) m.faConstraints.forEach(c => faRefIds.add(c.planerRefId));
-  });
   canvas.forEachObject(o => {
-    const isFaRef = o._pipeRefId != null && !o._noSelect && faRefIds.has(o._pipeRefId);
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && isFaRef);
+    const isFaMovable = !!o._faImported && !o._noSelect && !o._isPipeTag && !(o._pipeRefType && o._pipeRefType.endsWith('-label'));
+    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && isFaMovable);
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, FA refs
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || isFaRef;
+    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, FA imports
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || isFaMovable;
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
@@ -7436,9 +7432,10 @@ function importFeldaufnahme(data) {
     });
   }
 
-  // Unlock all imported reference objects so user can drag them
+  // Mark and unlock all imported reference objects so user can drag them
   allCreatedRefIds.forEach(function(rid) {
     canvas.getObjects().filter(function(o) { return o._pipeRefId === rid; }).forEach(function(o) {
+      o._faImported = true;
       o.lockMovementX = false;
       o.lockMovementY = false;
     });
