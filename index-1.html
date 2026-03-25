@@ -3833,10 +3833,11 @@ canvas.on('object:moving', opt => {
 
   // --- Line reference: reposition label + endpoint circles ---
   if (ref.type === 'line' && obj.type === 'line') {
-    // Get absolute endpoint positions from the line's transform matrix
+    // calcLinePoints() gibt lokale Koordinaten (zentriert um 0,0)
+    const lp = obj.calcLinePoints();
     const matrix = obj.calcTransformMatrix();
-    const absP1 = fabric.util.transformPoint(new fabric.Point(obj.x1, obj.y1), matrix);
-    const absP2 = fabric.util.transformPoint(new fabric.Point(obj.x2, obj.y2), matrix);
+    const absP1 = fabric.util.transformPoint(new fabric.Point(lp.x1, lp.y1), matrix);
+    const absP2 = fabric.util.transformPoint(new fabric.Point(lp.x2, lp.y2), matrix);
 
     // Reposition endpoint circles
     const circles = canvas.getObjects().filter(o => o._pipeRefId === refId && o._noSelect === true);
@@ -3860,11 +3861,11 @@ canvas.on('object:moving', opt => {
 
   // --- Point reference: reposition label ---
   if (ref.type === 'point' && obj._pipeRefType === 'point') {
-    const dx = obj.left - ref.x;
-    const dy = obj.top - ref.y;
+    const center = obj.getCenterPoint();
+    const dx = center.x - ref.x;
+    const dy = center.y - ref.y;
     const label = canvas.getObjects().find(o => o._pipeRefId === refId && o._pipeRefType === 'point-label');
     if (label) {
-      // Original label offset is (+6, -6) from the point position
       label.set({ left: ref.x + 6 + dx, top: ref.y - 6 + dy });
       label.setCoords();
     }
@@ -3881,13 +3882,17 @@ canvas.on('object:modified', opt => {
     const ref = state.pipeReferences.find(r => r.id === refId);
     if (ref) {
       if (ref.type === 'line' && obj.type === 'line') {
-        // Fabric Line speichert x1/y1/x2/y2 relativ zu origin
+        // calcLinePoints() gibt die lokalen Render-Koordinaten (zentriert um 0,0)
+        // obj.x1/y1 sind die Original-Konstruktor-Werte — NICHT für transformPoint nutzbar
+        const lp = obj.calcLinePoints();
         const matrix = obj.calcTransformMatrix();
-        const absP1 = fabric.util.transformPoint(new fabric.Point(obj.x1, obj.y1), matrix);
-        const absP2 = fabric.util.transformPoint(new fabric.Point(obj.x2, obj.y2), matrix);
+        const absP1 = fabric.util.transformPoint(new fabric.Point(lp.x1, lp.y1), matrix);
+        const absP2 = fabric.util.transformPoint(new fabric.Point(lp.x2, lp.y2), matrix);
         ref.x1 = absP1.x; ref.y1 = absP1.y; ref.x2 = absP2.x; ref.y2 = absP2.y;
       } else if (ref.type === 'point') {
-        ref.x = obj.left; ref.y = obj.top;
+        // getCenterPoint() gibt die Mitte des Objekts (nicht die BBox-Ecke wie left/top)
+        const center = obj.getCenterPoint();
+        ref.x = center.x; ref.y = center.y;
       }
     }
     // Alle Rohre die diese Ref nutzen neu rendern
