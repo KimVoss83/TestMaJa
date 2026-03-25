@@ -7458,7 +7458,7 @@ function applyFaConstraints(meas, movedRefId) {
   const polyline = canvas.getObjects().find(
     o => o._measureId === meas.id && o.type === 'polyline'
   );
-  if (!polyline) return;
+  if (!polyline) { console.warn('[FA] No polyline found for meas', meas.id); return; }
 
   const matrix = polyline.calcTransformMatrix();
   const absPts = polyline.points.map(pt =>
@@ -7468,6 +7468,12 @@ function applyFaConstraints(meas, movedRefId) {
     )
   );
 
+  console.log('[FA] applyFaConstraints meas=', meas.id, 'movedRefId=', movedRefId);
+  console.log('[FA] polyline left/top=', polyline.left, polyline.top, 'pathOffset=', polyline.pathOffset);
+  console.log('[FA] polyline.points raw=', polyline.points.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
+  console.log('[FA] absPts=', absPts.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
+  console.log('[FA] scale=', state.scale, 'imgDisplayScale=', state.imgDisplayScale);
+
   const newPts = absPts.map(p => ({ x: p.x, y: p.y }));
 
   // Only apply constraints for the moved reference, not all constraints
@@ -7475,12 +7481,15 @@ function applyFaConstraints(meas, movedRefId) {
     ? meas.faConstraints.filter(c => c.planerRefId === movedRefId)
     : meas.faConstraints;
 
+  console.log('[FA] activeConstraints=', activeConstraints.length, 'of', meas.faConstraints.length);
+
   activeConstraints.forEach(c => {
     const ref = state.pipeReferences.find(r => r.id === c.planerRefId);
-    if (!ref) return;
+    if (!ref) { console.warn('[FA] ref not found for planerRefId', c.planerRefId); return; }
 
-    if (!state.scale) return;
+    if (!state.scale) { console.warn('[FA] no scale set'); return; }
     const dist_px = c.value_m * state.scale * state.imgDisplayScale;
+    console.log('[FA] constraint:', c.type, 'elAnchor=', c.elementAnchor, 'value_m=', c.value_m, 'dist_px=', Math.round(dist_px), 'ref=', ref.type, ref.type==='line' ? {x1:Math.round(ref.x1),y1:Math.round(ref.y1),x2:Math.round(ref.x2),y2:Math.round(ref.y2)} : {x:Math.round(ref.x),y:Math.round(ref.y)});
 
     if (c.type === 'perpendicular' && c.elementAnchor.type === 'segment') {
       const segIdx = c.elementAnchor.index;
@@ -7554,6 +7563,8 @@ function applyFaConstraints(meas, movedRefId) {
       newPts[knickIdx].y = refPt.y + (curDy / curDist) * dist_px;
     }
   });
+
+  console.log('[FA] newPts after constraints=', newPts.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
 
   // Replace polyline — Fabric.js 5 polyline mutation is fragile (pathOffset/left/top desync).
   // Same approach as updatePipeFromHandles(): remove old, create new.
