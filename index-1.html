@@ -3822,6 +3822,57 @@ canvas.on('object:moving', opt => {
   updatePipeFromHandles();
 });
 
+// Sync sibling objects (labels, endpoint circles) when a pipe reference is dragged
+canvas.on('object:moving', opt => {
+  const obj = opt.target;
+  if (!obj || obj._pipeRefId == null) return;
+
+  const refId = obj._pipeRefId;
+  const ref = state.pipeReferences.find(r => r.id === refId);
+  if (!ref) return;
+
+  // --- Line reference: reposition label + endpoint circles ---
+  if (ref.type === 'line' && obj.type === 'line') {
+    // Get absolute endpoint positions from the line's transform matrix
+    const matrix = obj.calcTransformMatrix();
+    const absP1 = fabric.util.transformPoint(new fabric.Point(obj.x1, obj.y1), matrix);
+    const absP2 = fabric.util.transformPoint(new fabric.Point(obj.x2, obj.y2), matrix);
+
+    // Reposition endpoint circles
+    const circles = canvas.getObjects().filter(o => o._pipeRefId === refId && o._noSelect === true);
+    if (circles.length >= 2) {
+      circles[0].set({ left: absP1.x, top: absP1.y });
+      circles[0].setCoords();
+      circles[1].set({ left: absP2.x, top: absP2.y });
+      circles[1].setCoords();
+    }
+
+    // Reposition label at midpoint with perpendicular offset
+    const label = canvas.getObjects().find(o => o._pipeRefId === refId && o._pipeRefType === 'line-label');
+    if (label) {
+      const mx = (absP1.x + absP2.x) / 2, my = (absP1.y + absP2.y) / 2;
+      const angle = Math.atan2(absP2.y - absP1.y, absP2.x - absP1.x);
+      const offX = -Math.sin(angle) * 10, offY = Math.cos(angle) * 10;
+      label.set({ left: mx + offX, top: my + offY });
+      label.setCoords();
+    }
+  }
+
+  // --- Point reference: reposition label ---
+  if (ref.type === 'point' && obj._pipeRefType === 'point') {
+    const dx = obj.left - ref.x;
+    const dy = obj.top - ref.y;
+    const label = canvas.getObjects().find(o => o._pipeRefId === refId && o._pipeRefType === 'point-label');
+    if (label) {
+      // Original label offset is (+6, -6) from the point position
+      label.set({ left: ref.x + 6 + dx, top: ref.y - 6 + dy });
+      label.setCoords();
+    }
+  }
+
+  canvas.renderAll();
+});
+
 // Snapshot after any object is moved/scaled/rotated
 canvas.on('object:modified', opt => {
   const obj = opt.target;
