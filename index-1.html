@@ -1921,6 +1921,7 @@ const PIPE_TYPES = {
   GF:          { label: 'Glasfaser',          color: '#8E24AA', dash: [4,4,14,4],           strokeWidth: 5, icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>' },
   Cu:          { label: 'Kupfer',             color: '#EF6C00', dash: [8,3,8,3],            strokeWidth: 5, icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6.5l3-3"/><path d="M12 8.5l-3-3"/><path d="M12 22v-6.5l3 3"/><path d="M12 15.5l-3 3"/><circle cx="12" cy="12" r="3"/></svg>' },
   LR:          { label: 'Leerrohr',           color: '#9E9E9E', dash: [3,5],                strokeWidth: 5, icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>' },
+  FA:          { label: 'Feldaufnahme',      color: '#E65100', dash: [],                   strokeWidth: 2.5, icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
   // Legacy-Aliase (für alte gespeicherte Pläne)
   wasser:      { label: 'Trinkwasser',       color: '#1565C0', dash: [],                   strokeWidth: 5, get icon(){ return PIPE_TYPES.TW.icon; } },
   abwasser:    { label: 'Abwasser',           color: '#795548', dash: [20,4,4,4],           strokeWidth: 5, get icon(){ return PIPE_TYPES.AW.icon; } },
@@ -2378,7 +2379,7 @@ const CANVAS_SERIAL_PROPS = ['_measureId','_isRef','_noSelect','_circlePreview',
   '_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset',
   '_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib',
   '_dimLinePipeId','_dimDraggableFoot','_dimRefId','_dimMeasureId',
-  '_faImported','_isPipeTag'];
+  '_isPipeTag'];
 
 const history = { past: [], future: [], MAX: 40, _paused: false, _restoring: false };
 
@@ -2596,11 +2597,10 @@ function setTool(t) {
   if (t === 'select') _loupe.hide();
   if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
   canvas.forEachObject(o => {
-    const isFaMovable = !!o._faImported && !o._noSelect && !o._isPipeTag && !(o._pipeRefType && o._pipeRefType.endsWith('-label'));
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel) || (t === 'select' && isFaMovable);
+    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles, FA imports
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot || isFaMovable;
+    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot;
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
@@ -3740,7 +3740,7 @@ canvas.on('mouse:move', opt => {
 
   // Loupe: show when a drawing/measurement tool or anchor mode is active, hide during pan
   const _loupeActive =
-    (state.tool !== 'select' || _anchorExport.active || _anchorImport.active) &&
+    (state.tool !== 'select' || _anchorExport.active || _anchorImport.active || _faImport.active) &&
     !state.panning && !state.spacePan && !!state.backgroundImage;
   if (_loupeActive) { _loupe.show(); _loupe.update(opt.e.clientX, opt.e.clientY, opt.e.offsetX, opt.e.offsetY); }
   else              { _loupe.hide(); }
@@ -3899,10 +3899,6 @@ canvas.on('object:modified', opt => {
     state.measurements
       .filter(m => m.type === 'pipe' && m.refs?.includes(refId))
       .forEach(m => renderDimLinesForPipe(m.id));
-    // Propagate Feldaufnahme constraints — only for the moved reference
-    state.measurements
-      .filter(m => m.faConstraints && m.faConstraints.some(c => c.planerRefId === refId))
-      .forEach(m => applyFaConstraints(m, refId));
   }
   // Wenn ein Rohr verschoben wurde → seine Maßlinien neu berechnen
   if (obj?._measureId != null) {
@@ -4819,9 +4815,12 @@ function handlePipeRefClick(p) {
     promptPipeRefName('Hilfslinie benennen', name => {
       createPipeRefLine(p1, p, name || 'Hilfslinie');
     });
-    state.pipeRefMode = null;
-    state.pipeRefTempPt = null;
-    document.getElementById('btn-pipe-ref-line').classList.remove('active');
+    // Don't reset pipeRefMode if FA wizard already set the next step
+    if (!_faImport.active) {
+      state.pipeRefMode = null;
+      state.pipeRefTempPt = null;
+      document.getElementById('btn-pipe-ref-line').classList.remove('active');
+    }
     return true;
   }
   if (state.pipeRefMode === 'point') {
@@ -4829,14 +4828,24 @@ function handlePipeRefClick(p) {
     promptPipeRefName('Hilfspunkt benennen', name => {
       createPipeRefPoint(p, name || 'Hilfspunkt');
     });
-    state.pipeRefMode = null;
-    document.getElementById('btn-pipe-ref-point').classList.remove('active');
+    // Don't reset pipeRefMode if FA wizard already set the next step
+    if (!_faImport.active) {
+      state.pipeRefMode = null;
+      document.getElementById('btn-pipe-ref-point').classList.remove('active');
+    }
     return true;
   }
   return false;
 }
 
 function promptPipeRefName(title, cb) {
+  // During FA import wizard: use ref label directly, skip modal
+  if (_faImport.active && _faImport._waitingForRef) {
+    const ref = _faImport.refs[_faImport.currentRefIdx];
+    const autoName = ref ? (ref.label || ('Ref ' + ref.id)) : 'Hilfslinie';
+    cb(autoName);
+    return;
+  }
   createModal(title,
     `<input type="text" id="pipe-ref-name-input" placeholder="z.B. Grundstücksgrenze, Hauswand Nord" style="width:100%" />`,
     () => { cb(document.getElementById('pipe-ref-name-input').value.trim()); }
@@ -4891,6 +4900,14 @@ function createPipeRefLine(p1, p2, name) {
   sendPipesToBack();
   canvas.renderAll();
   document.getElementById('status-hint').textContent = TOOL_HINTS[state.tool] || '';
+
+  // Feldaufnahme-Import Wizard: capture created ref
+  if (_faImport.active && _faImport._waitingForRef && _faImport._waitingRefType === 'line') {
+    _faImport.refMap[_faImport._waitingRefId] = id;
+    _faImport._waitingForRef = false;
+    _faImport.currentRefIdx++;
+    _showNextFaRefStep();
+  }
 }
 
 function createPipeRefPoint(p, name) {
@@ -4930,6 +4947,14 @@ function createPipeRefPoint(p, name) {
   sendPipesToBack();
   canvas.renderAll();
   document.getElementById('status-hint').textContent = TOOL_HINTS[state.tool] || '';
+
+  // FA-Import Wizard: Hilfspunkt wurde erstellt → weiter zum nächsten Schritt
+  if (_faImport.active && _faImport._waitingForRef && _faImport._waitingRefType === 'point') {
+    _faImport.refMap[_faImport._waitingRefId] = id;
+    _faImport._waitingForRef = false;
+    _faImport.currentRefIdx++;
+    _showNextFaRefStep();
+  }
 }
 
 function removePipeRef(refId) {
@@ -7289,21 +7314,135 @@ document.getElementById('json-input').onchange = e => {
 // FELDAUFNAHME IMPORT (Desktop only)
 // =========================================================
 
+// ── Feldaufnahme Import Wizard State ──────────────────────
+const _faImport = {
+  active: false, data: null, refs: [], elements: [], constraints: [],
+  currentRefIdx: 0, refMap: {}, sketchRefs: {},
+  _waitingForRef: false, _waitingRefId: null, _waitingRefType: null
+};
+
+function _cancelFaImport() {
+  _faImport.active = false;
+  _faImport._waitingForRef = false;
+  _faImport.data = null;
+  _faImport.refs = [];
+  _faImport.elements = [];
+  _faImport.constraints = [];
+  _faImport.currentRefIdx = 0;
+  _faImport.refMap = {};
+  _faImport.sketchRefs = {};
+  _removeBanner();
+  canvas.renderAll();
+}
+
 function importFeldaufnahme(data) {
   if (!state.backgroundImage) {
     showToast('Bitte zuerst ein Hintergrundbild laden.', 'error');
     return;
   }
-  // Accept both v1 (no category) and v2 (with category/constraints)
   if (!data || (data.type !== 'feldaufnahme' && data.type !== 'feldaufnahme-project') || !Array.isArray(data.elements)) {
     showToast('Ungültiges Feldaufnahme-Format.', 'error');
     return;
   }
+
+  // v1 fallback: if no category field, do simple import (all as ref points/lines)
+  if (!data.elements.some(el => el.category)) {
+    _importFeldaufnahmeV1(data);
+    return;
+  }
+
   if (!state.scale && (data.constraints || []).length > 0) {
     showToast('Bitte zuerst einen Maßstab setzen, damit Abstände korrekt aufgelöst werden.', 'error');
     return;
   }
 
+  const refs = data.elements.filter(el => el.category === 'reference');
+  const elements = data.elements.filter(el => el.category === 'element');
+  const constraints = data.constraints || [];
+
+  if (refs.length === 0) {
+    showToast('Keine Referenzen in der Feldaufnahme gefunden.', 'error');
+    return;
+  }
+
+  // Store sketch reference geometry for later projection
+  const sketchRefs = {};
+  refs.forEach(el => {
+    if (el.type === 'line' && el.points && el.points.length >= 2) {
+      sketchRefs[el.id] = { type: 'line', points: el.points.map(p => ({ x: p.x, y: p.y })) };
+    } else if (el.type === 'point' && el.position) {
+      sketchRefs[el.id] = { type: 'point', position: { x: el.position.x, y: el.position.y } };
+    }
+  });
+
+  // Store sketch element geometry
+  const sketchElements = {};
+  elements.forEach(el => {
+    if (el.type === 'line' && el.points && el.points.length >= 2) {
+      sketchElements[el.id] = { type: 'line', points: el.points.map(p => ({ x: p.x, y: p.y })) };
+    } else if (el.type === 'point' && el.position) {
+      sketchElements[el.id] = { type: 'point', position: { x: el.position.x, y: el.position.y } };
+    }
+  });
+
+  // Initialize wizard state
+  _faImport.active = true;
+  _faImport.data = data;
+  _faImport.refs = refs;
+  _faImport.elements = elements;
+  _faImport.constraints = constraints;
+  _faImport.currentRefIdx = 0;
+  _faImport.refMap = {};
+  _faImport.sketchRefs = sketchRefs;
+  _faImport.sketchElements = sketchElements;
+
+  _showNextFaRefStep();
+}
+
+function _showNextFaRefStep() {
+  const idx = _faImport.currentRefIdx;
+  if (idx >= _faImport.refs.length) {
+    // All references placed — finish import
+    _faImport.active = false;
+    _faImport._waitingForRef = false;
+    _removeBanner();
+    _finishFaImport();
+    return;
+  }
+
+  const ref = _faImport.refs[idx];
+  const total = _faImport.refs.length;
+  const label = ref.label || ('Ref ' + ref.id);
+  const isLine = ref.type === 'line';
+  const typeName = isLine ? 'Hilfslinie' : 'Hilfspunkt';
+
+  _faImport._waitingForRef = true;
+  _faImport._waitingRefId = ref.id;
+  _faImport._waitingRefType = ref.type;
+
+  // Ensure tool is compatible with handlePipeRefClick routing
+  if (!['select','ref','distance','area','circle','arc','pipe'].includes(state.tool)) {
+    state.tool = 'select';
+  }
+
+  // Activate the correct pipe-ref tool
+  if (isLine) {
+    state.pipeRefMode = 'line-1';
+    document.getElementById('btn-pipe-ref-line')?.classList.add('active');
+    document.getElementById('btn-pipe-ref-point')?.classList.remove('active');
+  } else {
+    state.pipeRefMode = 'point';
+    document.getElementById('btn-pipe-ref-point')?.classList.add('active');
+    document.getElementById('btn-pipe-ref-line')?.classList.remove('active');
+  }
+
+  _anchorBannerImport(
+    `Zeichne ${typeName} <b>&bdquo;${label}&ldquo;</b> ein (${idx + 1}/${total})`
+  );
+}
+
+function _importFeldaufnahmeV1(data) {
+  // v1 format: no categories, just create ref points/lines for all elements
   const bg = state.backgroundImage;
   const s = state.imgDisplayScale;
   const offX = bg.left;
@@ -7322,275 +7461,252 @@ function importFeldaufnahme(data) {
     return { x: imgX * s + offX, y: imgY * s + offY };
   };
 
-  const refIdMap = {};
-  const allCreatedRefIds = []; // Track all created ref IDs for unlocking
-
-  // 1. Import references → Hilfslinien/Hilfspunkte
-  data.elements.filter(el => el.category === 'reference').forEach(el => {
-    const label = el.label || ('Ref ' + el.id);
+  data.elements.forEach(el => {
+    const label = el.label || ('E' + el.id);
     if (el.type === 'point' && el.position) {
       const p = toCanvas(el.position.x, el.position.y);
       createPipeRefPoint(p, label);
-      refIdMap[el.id] = pipeRefId;
-      allCreatedRefIds.push(pipeRefId);
     } else if (el.type === 'line' && el.points && el.points.length >= 2) {
       const pts = el.points.map(p => toCanvas(p.x, p.y));
-      const segRefIds = [];
-      for (let i = 0; i < pts.length - 1; i++) {
-        const segLabel = pts.length === 2 ? label : label + ' [' + (i + 1) + ']';
-        createPipeRefLine(pts[i], pts[i + 1], segLabel);
-        segRefIds.push({ segIndex: i, pipeRefId: pipeRefId });
-        allCreatedRefIds.push(pipeRefId);
-      }
-      const knickRefIds = [];
-      pts.forEach((p, i) => {
-        createPipeRefPoint(p, label + ' K' + (i + 1));
-        knickRefIds.push({ knickIndex: i, pipeRefId: pipeRefId });
-        allCreatedRefIds.push(pipeRefId);
-      });
-      refIdMap[el.id] = { segments: segRefIds, knicks: knickRefIds };
+      createPipeRefLine(pts[0], pts[pts.length - 1], label);
     }
-  });
-
-  // 2. Import elements → Leitungen (Polylines)
-  data.elements.filter(el => el.category === 'element').forEach(el => {
-    const label = el.label || ('E' + el.id);
-    if (el.type === 'line' && el.points && el.points.length >= 2) {
-      const pts = el.points.map(p => toCanvas(p.x, p.y));
-      const id = ++measureId;
-
-      const polyline = new fabric.Polyline(pts, {
-        fill: 'transparent',
-        stroke: '#E65100', strokeWidth: 2.5,
-        selectable: true, evented: true,
-        _measureId: id, _pipeType: 'FA', _faImported: true,
-        objectCaching: false,
-        lockScalingX: true, lockScalingY: true, lockRotation: true,
-      });
-      canvas.add(polyline);
-
-      pts.forEach(p => addEndpointDot(p.x, p.y, '#E65100', id));
-
-      const mid = pts[Math.floor(pts.length / 2)];
-      const tag = new fabric.Text(label, {
-        left: mid.x, top: mid.y - 12,
-        fontSize: 9, fontFamily: 'sans-serif', fontWeight: 'bold',
-        fill: '#fff', backgroundColor: '#E65100', padding: 3,
-        originX: 'center', originY: 'center',
-        selectable: true, evented: true,
-        _measureId: id, _pipeType: 'FA', _isPipeTag: true,
-      });
-      canvas.add(tag);
-
-      // Resolve constraints for this element
-      const faConstraints = [];
-      const allRefIds = new Set();
-      (data.constraints || []).filter(c => c.elementId === el.id).forEach(c => {
-        const refMapping = refIdMap[c.refId];
-        if (!refMapping) return;
-
-        let planerRefId;
-        if (typeof refMapping === 'number') {
-          planerRefId = refMapping;
-        } else if (refMapping.segments && c.refAnchor && c.refAnchor.type === 'line') {
-          planerRefId = refMapping.segments[0] && refMapping.segments[0].pipeRefId;
-        } else if (refMapping.knicks && c.refAnchor && c.refAnchor.type === 'knick') {
-          const ki = c.refAnchor.index || 0;
-          const knickRef = refMapping.knicks.find(function(k) { return k.knickIndex === ki; });
-          planerRefId = knickRef && knickRef.pipeRefId;
-        }
-
-        if (planerRefId) {
-          allRefIds.add(planerRefId);
-          faConstraints.push(Object.assign({}, c, { planerRefId: planerRefId }));
-        }
-      });
-
-      state.measurements.push({
-        id: id, type: 'pipe', label: label, value: null,
-        pipeType: 'FA', pipeDepth: null, refs: Array.from(allRefIds),
-        nennweite: null, faConstraints: faConstraints,
-        _faAbsPts: pts.map(p => ({ x: p.x, y: p.y })),
-      });
-
-
-    } else if (el.type === 'point' && el.position) {
-      const p = toCanvas(el.position.x, el.position.y);
-      createPipeRefPoint(p, label);
-      allCreatedRefIds.push(pipeRefId);
-    }
-  });
-
-  // v1 fallback: if no category field, import everything as-is (old behavior)
-  if (!data.elements.some(el => el.category)) {
-    // v1 format has no categories — just create ref points/lines for all elements
-    data.elements.forEach(el => {
-      const label = el.label || ('E' + el.id);
-      if (el.type === 'point' && el.position) {
-        const p = toCanvas(el.position.x, el.position.y);
-        createPipeRefPoint(p, label);
-        allCreatedRefIds.push(pipeRefId);
-      } else if (el.type === 'line' && el.points && el.points.length >= 2) {
-        const pts = el.points.map(p => toCanvas(p.x, p.y));
-        createPipeRefLine(pts[0], pts[pts.length - 1], label);
-        allCreatedRefIds.push(pipeRefId);
-      }
-    });
-  }
-
-  // Mark and unlock all imported reference objects so user can drag them
-  allCreatedRefIds.forEach(function(rid) {
-    canvas.getObjects().filter(function(o) { return o._pipeRefId === rid; }).forEach(function(o) {
-      o._faImported = true;
-      o.lockMovementX = false;
-      o.lockMovementY = false;
-    });
   });
 
   renderAllDimLines();
   sendPipesToBack();
   canvas.renderAll();
   saveSnapshot();
-
-  var nRef = data.elements.filter(function(e) { return e.category === 'reference'; }).length;
-  var nEl = data.elements.filter(function(e) { return e.category === 'element'; }).length;
-  var nC = (data.constraints || []).length;
-  showToast('Import: ' + nEl + ' Element(e), ' + nRef + ' Referenz(en), ' + nC + ' Maß(e)', 'success');
+  showToast('Import (v1): ' + data.elements.length + ' Element(e)', 'success');
 }
 
-function applyFaConstraints(meas, movedRefId) {
-  if (!meas.faConstraints || meas.faConstraints.length === 0) return;
-  if (!meas._faAbsPts || meas._faAbsPts.length === 0) return;
+function _finishFaImport() {
+  const { elements, constraints, refMap, sketchRefs, sketchElements } = _faImport;
 
-  // Read absolute points directly — bypass Fabric.js transform math entirely
-  const newPts = meas._faAbsPts.map(p => ({ x: p.x, y: p.y }));
+  let importedCount = 0;
 
-  // Only apply constraints for the moved reference, not all constraints
-  const activeConstraints = movedRefId != null
-    ? meas.faConstraints.filter(c => c.planerRefId === movedRefId)
-    : meas.faConstraints;
+  elements.forEach(el => {
+    if (el.type !== 'line' || !el.points || el.points.length < 2) return;
 
-  console.log('[FA] solver: meas=', meas.id, 'pts=', newPts.map(p=>({x:Math.round(p.x),y:Math.round(p.y)})),
-    'constraints=', activeConstraints.length, 'scale=', state.scale, 'imgDisplayScale=', state.imgDisplayScale);
+    const label = el.label || ('E' + el.id);
+    const sketchPts = el.points.map(p => ({ x: p.x, y: p.y }));
+    const elConstraints = constraints.filter(c => c.elementId === el.id);
 
-  activeConstraints.forEach(c => {
-    const ref = state.pipeReferences.find(r => r.id === c.planerRefId);
-    if (!ref) return;
+    // Build a map: point index → list of constraints targeting it
+    const ptConstraints = {};
+    elConstraints.forEach(c => {
+      if (!refMap[c.refId]) return;
 
-    if (!state.scale) return;
-    const dist_px = c.value_m * state.scale * state.imgDisplayScale;
-    console.log('[FA]  constraint:', c.type, c.elementAnchor, 'dist_px=', Math.round(dist_px),
-      'ref=', ref.type === 'line' ? {x1:Math.round(ref.x1),y1:Math.round(ref.y1),x2:Math.round(ref.x2),y2:Math.round(ref.y2)} : {x:Math.round(ref.x),y:Math.round(ref.y)});
+      if (c.elementAnchor.type === 'segment') {
+        const segIdx = c.elementAnchor.index;
+        if (segIdx < sketchPts.length - 1) {
+          [segIdx, segIdx + 1].forEach(i => {
+            if (!ptConstraints[i]) ptConstraints[i] = [];
+            ptConstraints[i].push({ constraint: c, segEndpoint: true, segIdx: segIdx });
+          });
+        }
+      } else if (c.elementAnchor.type === 'knick') {
+        const ki = c.elementAnchor.index;
+        if (ki < sketchPts.length) {
+          if (!ptConstraints[ki]) ptConstraints[ki] = [];
+          ptConstraints[ki].push({ constraint: c, segEndpoint: false });
+        }
+      }
+    });
 
-    if (c.type === 'perpendicular' && c.elementAnchor.type === 'segment') {
-      const segIdx = c.elementAnchor.index;
-      if (segIdx >= newPts.length - 1) return;
+    // Calculate Planer positions for each point
+    const planerPts = new Array(sketchPts.length);
 
-      if (ref.type === 'line') {
-        const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
-        const len = Math.hypot(dx, dy);
-        if (len < 1e-9) return;
-        const nx = -dy / len, ny = dx / len;
+    // First pass: constrained points
+    for (let i = 0; i < sketchPts.length; i++) {
+      if (!ptConstraints[i] || ptConstraints[i].length === 0) continue;
 
-        const midSeg = {
-          x: (newPts[segIdx].x + newPts[segIdx + 1].x) / 2,
-          y: (newPts[segIdx].y + newPts[segIdx + 1].y) / 2,
+      // Use the first constraint for this point
+      const { constraint: c, segEndpoint, segIdx } = ptConstraints[i][0];
+      const planerRefId = refMap[c.refId];
+      const ref = state.pipeReferences.find(r => r.id === planerRefId);
+      if (!ref) continue;
+
+      const dist_px = c.value_m * state.scale * state.imgDisplayScale;
+
+      if (c.type === 'perpendicular' && ref.type === 'line') {
+        // Get sketch reference line (simplified: first to last point)
+        const skRef = sketchRefs[c.refId];
+        if (!skRef || skRef.type !== 'line') continue;
+        const skRefPts = skRef.points;
+        const skRefP1 = skRefPts[0];
+        const skRefP2 = skRefPts[skRefPts.length - 1];
+
+        // Sketch reference direction
+        const skDx = skRefP2.x - skRefP1.x, skDy = skRefP2.y - skRefP1.y;
+        const skLen = Math.hypot(skDx, skDy);
+        if (skLen < 1e-9) continue;
+
+        // Project sketch element point onto sketch reference line → parameter t
+        const t = ((sketchPts[i].x - skRefP1.x) * skDx + (sketchPts[i].y - skRefP1.y) * skDy) / (skLen * skLen);
+
+        // Planer reference direction
+        const plDx = ref.x2 - ref.x1, plDy = ref.y2 - ref.y1;
+        const plLen = Math.hypot(plDx, plDy);
+        if (plLen < 1e-9) continue;
+
+        // Foot on Planer Hilfslinie at parameter t
+        const footX = ref.x1 + t * plDx;
+        const footY = ref.y1 + t * plDy;
+
+        // Normal of Planer reference line
+        const plNx = -plDy / plLen, plNy = plDx / plLen;
+
+        // Determine side from sketch: dot product of (sketchPt - sketchFoot) with sketch normal
+        const skFootX = skRefP1.x + t * skDx;
+        const skFootY = skRefP1.y + t * skDy;
+        const skNx = -skDy / skLen, skNy = skDx / skLen;
+        const side = (sketchPts[i].x - skFootX) * skNx + (sketchPts[i].y - skFootY) * skNy;
+        const sign = side >= 0 ? 1 : -1;
+
+        planerPts[i] = {
+          x: footX + sign * dist_px * plNx,
+          y: footY + sign * dist_px * plNy
         };
-        const refMid = { x: (ref.x1 + ref.x2) / 2, y: (ref.y1 + ref.y2) / 2 };
-        const side = (midSeg.x - refMid.x) * nx + (midSeg.y - refMid.y) * ny;
-        const sign = side >= 0 ? 1 : -1;
 
-        [segIdx, segIdx + 1].forEach(i => {
-          const t = ((newPts[i].x - ref.x1) * dx + (newPts[i].y - ref.y1) * dy) / (len * len);
-          const footX = ref.x1 + t * dx;
-          const footY = ref.y1 + t * dy;
-          newPts[i].x = footX + sign * dist_px * nx;
-          newPts[i].y = footY + sign * dist_px * ny;
-        });
+      } else if (c.type === 'point-to-point') {
+        // Reference point in Planer
+        let refPt;
+        if (ref.type === 'point') {
+          refPt = { x: ref.x, y: ref.y };
+        } else if (ref.type === 'line') {
+          // Use closest endpoint to the sketch knick position
+          const skRef = sketchRefs[c.refId];
+          if (skRef && skRef.type === 'line') {
+            const skRefPts = skRef.points;
+            const d1 = Math.hypot(sketchPts[i].x - skRefPts[0].x, sketchPts[i].y - skRefPts[0].y);
+            const d2 = Math.hypot(sketchPts[i].x - skRefPts[skRefPts.length - 1].x, sketchPts[i].y - skRefPts[skRefPts.length - 1].y);
+            refPt = d1 <= d2 ? { x: ref.x1, y: ref.y1 } : { x: ref.x2, y: ref.y2 };
+          } else {
+            refPt = { x: ref.x1, y: ref.y1 };
+          }
+        } else {
+          continue;
+        }
+
+        // Direction from sketch
+        const skRef = sketchRefs[c.refId];
+        let skRefPt;
+        if (skRef && skRef.type === 'point') {
+          skRefPt = skRef.position;
+        } else if (skRef && skRef.type === 'line') {
+          const skRefPts = skRef.points;
+          const d1 = Math.hypot(sketchPts[i].x - skRefPts[0].x, sketchPts[i].y - skRefPts[0].y);
+          const d2 = Math.hypot(sketchPts[i].x - skRefPts[skRefPts.length - 1].x, sketchPts[i].y - skRefPts[skRefPts.length - 1].y);
+          skRefPt = d1 <= d2 ? skRefPts[0] : skRefPts[skRefPts.length - 1];
+        } else {
+          continue;
+        }
+
+        const dirX = sketchPts[i].x - skRefPt.x;
+        const dirY = sketchPts[i].y - skRefPt.y;
+        const dirLen = Math.hypot(dirX, dirY);
+        if (dirLen < 1e-9) continue;
+
+        planerPts[i] = {
+          x: refPt.x + (dirX / dirLen) * dist_px,
+          y: refPt.y + (dirY / dirLen) * dist_px
+        };
       }
+    }
 
-    } else if (c.type === 'perpendicular' && c.elementAnchor.type === 'knick') {
-      const knickIdx = c.elementAnchor.index;
-      if (knickIdx >= newPts.length) return;
+    // Second pass: unconstrained points — interpolate between constrained neighbors
+    for (let i = 0; i < sketchPts.length; i++) {
+      if (planerPts[i]) continue;
 
-      if (ref.type === 'line') {
-        const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
-        const len = Math.hypot(dx, dy);
-        if (len < 1e-9) return;
-        const nx = -dy / len, ny = dx / len;
+      // Find nearest constrained neighbor before and after
+      let prevIdx = -1, nextIdx = -1;
+      for (let j = i - 1; j >= 0; j--) { if (planerPts[j]) { prevIdx = j; break; } }
+      for (let j = i + 1; j < sketchPts.length; j++) { if (planerPts[j]) { nextIdx = j; break; } }
 
-        const side = (newPts[knickIdx].x - ref.x1) * nx + (newPts[knickIdx].y - ref.y1) * ny;
-        const sign = side >= 0 ? 1 : -1;
-
-        const t = ((newPts[knickIdx].x - ref.x1) * dx + (newPts[knickIdx].y - ref.y1) * dy) / (len * len);
-        const footX = ref.x1 + t * dx;
-        const footY = ref.y1 + t * dy;
-        newPts[knickIdx].x = footX + sign * dist_px * nx;
-        newPts[knickIdx].y = footY + sign * dist_px * ny;
-      }
-
-    } else if (c.type === 'point-to-point' && c.elementAnchor.type === 'knick') {
-      const knickIdx = c.elementAnchor.index;
-      if (knickIdx >= newPts.length) return;
-
-      let refPt;
-      if (ref.type === 'point') {
-        refPt = { x: ref.x, y: ref.y };
-      } else if (ref.type === 'line') {
-        // Use the endpoint closest to the knick
-        const d1 = Math.hypot(newPts[knickIdx].x - ref.x1, newPts[knickIdx].y - ref.y1);
-        const d2 = Math.hypot(newPts[knickIdx].x - ref.x2, newPts[knickIdx].y - ref.y2);
-        refPt = d1 <= d2 ? { x: ref.x1, y: ref.y1 } : { x: ref.x2, y: ref.y2 };
+      if (prevIdx >= 0 && nextIdx >= 0) {
+        // Linear interpolation between two constrained neighbors
+        const frac = (i - prevIdx) / (nextIdx - prevIdx);
+        planerPts[i] = {
+          x: planerPts[prevIdx].x + frac * (planerPts[nextIdx].x - planerPts[prevIdx].x),
+          y: planerPts[prevIdx].y + frac * (planerPts[nextIdx].y - planerPts[prevIdx].y)
+        };
+      } else if (prevIdx >= 0) {
+        // Extrapolate from prev using sketch delta
+        const skDx = sketchPts[i].x - sketchPts[prevIdx].x;
+        const skDy = sketchPts[i].y - sketchPts[prevIdx].y;
+        const scaleFactor = state.imgDisplayScale;
+        planerPts[i] = {
+          x: planerPts[prevIdx].x + skDx * scaleFactor,
+          y: planerPts[prevIdx].y + skDy * scaleFactor
+        };
+      } else if (nextIdx >= 0) {
+        // Extrapolate from next using sketch delta
+        const skDx = sketchPts[i].x - sketchPts[nextIdx].x;
+        const skDy = sketchPts[i].y - sketchPts[nextIdx].y;
+        const scaleFactor = state.imgDisplayScale;
+        planerPts[i] = {
+          x: planerPts[nextIdx].x + skDx * scaleFactor,
+          y: planerPts[nextIdx].y + skDy * scaleFactor
+        };
       } else {
+        // No constrained neighbors at all — skip this element
         return;
       }
-
-      const curDx = newPts[knickIdx].x - refPt.x;
-      const curDy = newPts[knickIdx].y - refPt.y;
-      const curDist = Math.hypot(curDx, curDy);
-      if (curDist < 1e-9) return;
-
-      newPts[knickIdx].x = refPt.x + (curDx / curDist) * dist_px;
-      newPts[knickIdx].y = refPt.y + (curDy / curDist) * dist_px;
     }
+
+    // All points resolved — create the pipe on canvas
+    const pts = planerPts;
+    const id = ++measureId;
+    const pt = PIPE_TYPES['FA'];
+
+    const polyline = new fabric.Polyline(pts.map(p => ({ x: p.x, y: p.y })), {
+      fill: 'transparent',
+      stroke: pt.color, strokeWidth: pt.strokeWidth,
+      selectable: true, evented: true,
+      _measureId: id, _pipeType: 'FA',
+      objectCaching: false,
+      lockScalingX: true, lockScalingY: true, lockRotation: true,
+      lockMovementX: true, lockMovementY: true,
+    });
+    canvas.add(polyline);
+
+    pts.forEach(p => addEndpointDot(p.x, p.y, pt.color, id));
+
+    const mid = pts[Math.floor(pts.length / 2)];
+    const tag = new fabric.Text(label, {
+      left: mid.x, top: mid.y - 12,
+      fontSize: 9, fontFamily: 'sans-serif', fontWeight: 'bold',
+      fill: '#fff', backgroundColor: pt.color, padding: 3,
+      originX: 'center', originY: 'center',
+      selectable: true, evented: true,
+      _measureId: id, _pipeType: 'FA', _isPipeTag: true,
+      lockMovementX: true, lockMovementY: true,
+    });
+    canvas.add(tag);
+
+    // Collect ref IDs used by this element
+    const allRefIds = new Set();
+    elConstraints.forEach(c => {
+      if (refMap[c.refId]) allRefIds.add(refMap[c.refId]);
+    });
+
+    state.measurements.push({
+      id: id, type: 'pipe', label: label, value: null,
+      pipeType: 'FA', pipeDepth: null, refs: Array.from(allRefIds),
+      nennweite: null,
+    });
+
+    importedCount++;
   });
 
-  console.log('[FA] newPts after constraints=', newPts.map(p => ({x:Math.round(p.x), y:Math.round(p.y)})));
-
-  // Store updated absolute points back
-  meas._faAbsPts = newPts.map(p => ({ x: p.x, y: p.y }));
-
-  // Replace polyline — Fabric.js 5 polyline mutation is fragile (pathOffset/left/top desync).
-  // Same approach as updatePipeFromHandles(): remove old, create new.
-  const oldPolyline = canvas.getObjects().find(o => o._measureId === meas.id && o.type === 'polyline');
-  if (oldPolyline) canvas.remove(oldPolyline);
-  const newPolyline = new fabric.Polyline(newPts.map(p => ({ x: p.x, y: p.y })), {
-    fill: 'transparent',
-    stroke: '#E65100', strokeWidth: 2.5,
-    selectable: true, evented: true,
-    _measureId: meas.id, _pipeType: 'FA', _faImported: true,
-    objectCaching: false,
-    lockScalingX: true, lockScalingY: true, lockRotation: true,
-  });
-  canvas.add(newPolyline);
-
-  // Replace endpoint dots
-  canvas.getObjects()
-    .filter(o => o._measureId === meas.id && o.type === 'circle' && o._noSelect)
-    .forEach(o => canvas.remove(o));
-  newPts.forEach(p => addEndpointDot(p.x, p.y, '#E65100', meas.id));
-
-  // Reposition tag
-  const tag = canvas.getObjects().find(o => o._measureId === meas.id && o._isPipeTag);
-  if (tag) {
-    const mid = newPts[Math.floor(newPts.length / 2)];
-    tag.left = mid.x; tag.top = mid.y - 12;
-    tag.setCoords();
-  }
-
+  renderAllDimLines();
   sendPipesToBack();
-  renderDimLinesForPipe(meas.id);
+  updateMeasurementList();
+  updatePipeLegend();
   canvas.renderAll();
+  saveSnapshot();
+
+  showToast('Import abgeschlossen: ' + importedCount + ' Leitung(en)', 'success');
 }
 
 document.getElementById('feldaufnahme-import-input').onchange = e => {
