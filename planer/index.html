@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Planer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: #f0f0f0;
+      color: #2d2d2d;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header (Canva dark) ── */
+    #header {
+      background: #252627;
+      padding: 0 16px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #3a3a3a;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    #header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #header-sub {
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 0.1px;
+    }
+    #header .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    #header .header-actions button,
+    #header .header-actions .file-trigger {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    #header .header-actions button:hover,
+    #header .header-actions .file-trigger:hover {
+      background: rgba(255,255,255,0.14);
+      color: #fff;
+    }
+    #header .header-actions button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    #header .header-actions button.danger { color: #ff6b6b; }
+    #header .header-actions button.danger:hover { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+    #header .header-actions .header-divider {
+      width: 1px;
+      height: 24px;
+      background: #3a3a3a;
+      margin: 0 4px;
+    }
+    @media (max-width: 600px) {
+      #header-sub { display: none; }
+    }
+
+    /* ── Toolbar scroll fade (mobile) ── */
+    @media (max-width: 900px) {
+      #toolbar {
+        position: relative;
+      }
+      #toolbar::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 32px;
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.95));
+        pointer-events: none;
+        z-index: 2;
+      }
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .toolbar-row {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      flex-wrap: wrap;
+    }
+    .toolbar-row:last-child { border-bottom: none; }
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 10px;
+      border-right: 1px solid #e5e7eb;
+    }
+    .tool-group:last-child { border-right: none; }
+    .tool-group > label {
+      font-size: 10px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      font-weight: 600;
+      margin-right: 2px;
+    }
+
+    /* ── Buttons ── */
+    button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #374151;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 500;
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+      -webkit-font-smoothing: antialiased;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button:hover { background: #f3f4f6; color: #2d2d2d; }
+    button.active {
+      background: #f0ebff;
+      color: #7B2FBE;
+      font-weight: 600;
+    }
+    button.active:hover { background: #e8dfff; color: #6a24b0; }
+    button.danger { color: #dc2626; }
+    button.danger:hover { background: #fef2f2; color: #dc2626; }
+    button.needs-ref { opacity: 0.5; }
+    button.needs-ref:hover { background: #fef2f2; color: #dc2626; cursor: not-allowed; }
+    button .btn-icon { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; }
+    button .btn-icon svg { width: 16px; height: 16px; }
+
+    /* ── Scale-unset warning chip ── */
+    .scale-unset-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #92400e;
+    }
+    .scale-unset-hint {
+      font-size: 10.5px;
+      color: #8e8e93;
+      margin-top: 4px;
+      line-height: 1.45;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+    /* ── Main layout ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 260px;
+      min-width: 200px;
+      max-width: 480px;
+      background: #ffffff;
+      border-right: 1px solid #e5e7eb;
+      padding: 0;
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      user-select: none;
+    }
+    #sidebar-resize-handle {
+      position: absolute;
+      top: 0; right: -3px; bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #sidebar-resize-handle::after {
+      content: '';
+      width: 2px;
+      height: 32px;
+      background: #d1d5db;
+      border-radius: 2px;
+      transition: background 0.2s, height 0.2s;
+    }
+    #sidebar-resize-handle:hover::after,
+    #sidebar-resize-handle.dragging::after {
+      background: #8B3DFF;
+      height: 48px;
+    }
+    .lib-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) !important;
+      gap: 5px;
+    }
+    .panel {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 10px 11px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .panel p {
+      font-size: 11.5px;
+      color: #6b7280;
+      line-height: 1.55;
+      margin-bottom: 4px;
+    }
+
+    /* ── Measurement list ── */
+    #measurements-list { display: flex; flex-direction: column; gap: 5px; }
+    .measurement-item {
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .measurement-item .m-label {
+      color: #2d2d2d;
+      font-weight: 600;
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .measurement-item .m-value { color: #374151; }
+    .measurement-item .m-accuracy { color: #9ca3af; font-size: 10px; margin-top: 2px; }
+    .m-delete {
+      background: none; border: none; color: #dc2626;
+      cursor: pointer; font-size: 13px; padding: 0; line-height: 1;
+      transition: color 0.3s;
+    }
+    .m-delete:hover { color: #b91c1c; }
+    .m-calc {
+      background: none; border: none; color: #6b7280;
+      cursor: pointer; font-size: 13px; padding: 0; line-height: 1; margin-right: 6px;
+      transition: color 0.3s;
+    }
+    .m-calc:hover { color: #2d2d2d; }
+    .m-btns { display: flex; align-items: center; gap: 2px; }
+    .calc-result-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; border-bottom: 1px solid #e5e7eb; font-size: 13px;
+    }
+    .calc-result-row:last-child { border-bottom: none; }
+    .calc-result-label { color: #6b7280; }
+    .calc-result-value { color: #2d2d2d; font-weight: 600; }
+    .calc-note { font-size: 11px; color: #9ca3af; margin-top: 8px; font-style: italic; }
+    .calc-hint {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+      padding: 10px 12px; margin: 8px 0; font-size: 11.5px; line-height: 1.6;
+      color: #1e40af;
+    }
+    .calc-hint.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .calc-hint-row { display: flex; gap: 7px; align-items: flex-start; margin-bottom: 3px; }
+    .calc-hint-row:last-child { margin-bottom: 0; }
+    .calc-hint-ico { flex-shrink: 0; font-size: 13px; line-height: 1.4; }
+    .calc-hint-diagram {
+      font-family: monospace; font-size: 10px; line-height: 1.5;
+      background: rgba(0,0,0,0.04); border-radius: 5px; padding: 5px 8px;
+      margin-top: 6px; color: #374151; white-space: pre;
+    }
+    .calc-copy-btn {
+      display: block; width: 100%; margin-top: 10px; padding: 8px;
+      background: #8B3DFF; color: #fff; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: background 0.15s;
+    }
+    .calc-copy-btn:hover { background: #7B2FBE; }
+    .calc-copy-btn:active { background: #6a24b0; }
+
+    /* ── Color picker ── */
+    .color-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .color-dot {
+      width: 19px; height: 19px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: transform 0.12s, box-shadow 0.12s;
+      flex-shrink: 0;
+    }
+    .color-dot:hover { transform: scale(1.2); transition: transform 0.3s; }
+    .color-dot.active { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #8B3DFF; }
+
+    /* ── Line width picker ── */
+    .lw-row { display: flex; align-items: center; gap: 3px; }
+    .lw-dot {
+      width: 30px; height: 26px; border-radius: 6px; cursor: pointer;
+      border: 1.5px solid transparent;
+      display: flex; align-items: center; justify-content: center;
+      color: #636366; transition: all 0.12s;
+    }
+    .lw-dot:hover { background: #f3f4f6; color: #2d2d2d; transition: background 0.3s; }
+    .lw-dot.active { background: #8B3DFF; color: #fff; border-color: #8B3DFF; }
+    .lw-dot.active svg line { stroke: #fff; }
+
+    /* ── Font size input ── */
+    #font-size-input {
+      width: 46px; padding: 4px 6px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #2d2d2d; font-size: 12px;
+      text-align: center; font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    #font-size-input:focus { border-color: #8B3DFF; outline: none; background: #fff; }
+
+    #pipe-type-select {
+      padding: 4px 8px; border-radius: 6px; font-size: 12px;
+      border: 1px solid #e5e7eb; background: #f9fafb;
+      color: #2d2d2d; font-family: inherit; min-height: 32px;
+      transition: border-color 0.3s;
+    }
+    #pipe-type-select:focus { border-color: #8B3DFF; outline: none; background: #fff; }
+    #pipe-depth-input {
+      width: 58px; padding: 4px 6px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #2d2d2d; font-size: 12px;
+      text-align: center; font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    #pipe-depth-input:focus { border-color: #8B3DFF; outline: none; background: #fff; }
+    #pipe-nennweite-input {
+      width: 60px; padding: 3px 6px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #2d2d2d; font-size: 11px;
+      font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    #pipe-nennweite-input:focus { border-color: #8B3DFF; outline: none; background: #fff; }
+
+    .pipe-ref-btns { display: flex; gap: 4px; margin-bottom: 4px; }
+    .pipe-ref-btns button {
+      font-size: 10px; padding: 3px 7px; border-radius: 5px;
+      border: 1px solid rgba(0,0,0,0.12); background: rgba(0,0,0,0.04);
+      color: #1d1d1f; cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .pipe-ref-btns button:hover { background: #f3f4f6; }
+    .pipe-ref-btns button.active { background: #8B3DFF; color: #fff; border-color: #8B3DFF; }
+    #pipe-ref-list { max-height: 120px; overflow-y: auto; }
+    .pipe-ref-item {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 10px; padding: 2px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+    .pipe-ref-item input[type="checkbox"] { margin: 0; width: 13px; height: 13px; }
+    .pipe-ref-item .ref-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pipe-ref-item .ref-delete {
+      background: none; border: none; color: #ff3b30; cursor: pointer;
+      font-size: 11px; padding: 0 2px; line-height: 1;
+    }
+
+    /* ── Leitungsebene Sidebar ── */
+    .pipe-layer-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 7px;
+    }
+    .pipe-layer-toggle-btn {
+      font-size: 10.5px; padding: 2px 9px; border-radius: 6px;
+      border: 1.5px solid #8B3DFF;
+      background: #8B3DFF; color: #fff;
+      cursor: pointer; font-family: inherit; transition: all 0.15s;
+    }
+    .pipe-layer-toggle-btn:hover { background: #7B2FBE; border-color: #7B2FBE; }
+    .pipe-layer-toggle-btn.hidden-layer {
+      border-color: #d1d5db; background: #f9fafb; color: #9ca3af;
+    }
+    .pipe-layer-toggle-btn.hidden-layer:hover { background: #f3f4f6; border-color: #9ca3af; color: #6b7280; }
+    .pipe-group { margin-bottom: 6px; }
+    .pipe-group-header {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 7px; border-radius: 6px;
+      background: #f3f4f6;
+      font-size: 11px; font-weight: 600; color: #2d2d2d;
+      margin-bottom: 2px;
+    }
+    .pipe-group-icon { flex-shrink: 0; display: inline-flex; align-items: center; }
+    .pipe-group-icon svg { width: 14px; height: 14px; }
+    .pipe-group-name { flex: 1; }
+    .pipe-group-total { color: #9ca3af; font-weight: 500; font-size: 10px; white-space: nowrap; }
+    .pipe-item {
+      display: flex; align-items: center;
+      padding: 3px 4px 3px 16px; font-size: 10.5px; color: #6b7280;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .pipe-item:last-child { border-bottom: none; }
+    .pipe-item-info { flex: 1; }
+
+    /* ── Eigene Bibliothek ── */
+    .custom-lib-bar {
+      display: flex; gap: 4px; margin-bottom: 8px;
+    }
+    .custom-lib-bar button {
+      flex: 1; font-size: 10px; padding: 4px 5px;
+      border: 1px solid #e5e7eb; border-radius: 6px;
+      background: #f9fafb; color: #374151; cursor: pointer;
+      font-family: inherit; transition: all 0.2s; white-space: nowrap;
+    }
+    .custom-lib-bar button:hover { background: #f3f4f6; border-color: #8B3DFF; color: #7B2FBE; }
+    .custom-lib-bar button.linked { border-color: #8B3DFF; background: #8B3DFF; color: #fff; }
+    .custom-item { position: relative; }
+    .custom-item-del {
+      position: absolute; top: 2px; right: 2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(220,38,38,0.85); color: #fff;
+      border: none; cursor: pointer; font-size: 8px; line-height: 14px;
+      text-align: center; padding: 0; display: none;
+    }
+    .custom-item:hover .custom-item-del { display: block; }
+
+    /* ── Akkordeon Sidebar ── */
+    .acc-section { border-bottom: 1px solid #f0f0f0; }
+    .acc-section:last-child { border-bottom: none; }
+    .acc-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; cursor: pointer; user-select: none;
+      gap: 8px;
+    }
+    .acc-header:hover .acc-title { color: #7B2FBE; }
+    .acc-title {
+      font-size: 13px; color: #374151;
+      font-weight: 600; flex: 1;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .acc-title .acc-icon { width: 16px; height: 16px; color: #9ca3af; flex-shrink: 0; display: inline-flex; position: relative; }
+    .acc-title .acc-icon svg { width: 16px; height: 16px; }
+    .acc-badge { position: absolute; top: -3px; right: -4px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; display: none; border: 1.5px solid #fff; }
+    .acc-badge.visible { display: block; }
+    .acc-header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .acc-chevron {
+      font-size: 9px; color: #9ca3af; transition: transform 0.25s ease;
+      line-height: 1; flex-shrink: 0;
+    }
+    .acc-section.open .acc-chevron { transform: rotate(180deg); }
+    .acc-body {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.28s cubic-bezier(.4,0,.2,1);
+    }
+    .acc-section.open .acc-body { max-height: 600px; }
+    .acc-body-inner { padding: 0 12px 12px; }
+
+    /* ── Schriftgrößen-Cluster ── */
+    .font-cluster-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .font-cluster-row:last-child { border-bottom: none; }
+    .font-cluster-label {
+      font-size: 11px; color: #374151; font-weight: 500; flex: 1;
+    }
+    .font-cluster-input {
+      width: 46px; padding: 3px 5px;
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 6px; color: #2d2d2d; font-size: 11px;
+      text-align: center; font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .font-cluster-input:focus { border-color: #8B3DFF; outline: none; background: #fff; }
+    .font-cluster-row-inline {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 0 8px; margin-bottom: 6px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .font-cluster-row-inline label {
+      font-size: 11px; color: #9ca3af; font-weight: 500;
+    }
+
+    /* ── Metadaten ── */
+    .meta-row { display:flex; justify-content:space-between; align-items:baseline; padding:3px 0; border-bottom:1px solid #f3f4f6; font-size:11px; }
+    .meta-row:last-child { border-bottom:none; }
+    .meta-key { color:#9ca3af; flex-shrink:0; margin-right:6px; }
+    .meta-val { color:#2d2d2d; font-weight:500; text-align:right; word-break:break-all; }
+    .meta-warn { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:7px 9px; margin-top:6px; font-size:11px; color:#92400e; line-height:1.45; }
+    .meta-ok   { background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:7px 9px; margin-top:6px; font-size:11px; color:#166534; line-height:1.45; }
+
+    /* ── Bibliothek ── */
+    .lib-cats { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 7px; }
+    .lib-cat {
+      padding: 3px 9px; border-radius: 6px; font-size: 10px; font-weight: 600;
+      background: #f3f4f6; color: #6b7280; border: 1px solid transparent; cursor: pointer;
+      transition: all 0.3s; font-family: inherit; letter-spacing: 0.3px;
+    }
+    .lib-cat.active { background: #8B3DFF; color: #fff; border-color: #8B3DFF; }
+    .lib-cat:hover:not(.active) { background: #f0ebff; color: #7B2FBE; }
+
+    .lib-item {
+      background: #fff; border-radius: 8px; padding: 6px 3px 5px;
+      cursor: pointer; text-align: center;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      transition: all 0.3s;
+      user-select: none;
+      aspect-ratio: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .lib-item:hover { border-color: #8B3DFF; box-shadow: 0 4px 12px rgba(139,61,255,0.15); transform: scale(1.04); }
+    .lib-item:active { transform: scale(0.97); }
+    .lib-item svg { display: block; margin: 0 auto; width: 40px; height: 40px; }
+    .lib-item span { display: block; font-size: 9px; color: #6b7280; margin-top: 3px; line-height: 1.25; font-weight: 500; }
+
+    /* ── Canvas ── */
+    #canvas-wrapper { flex: 1; overflow: hidden; position: relative; background: #f0f0f0; }
+    canvas { display: block; }
+    #canvas-wrapper.space-pan { cursor: grab !important; }
+    #canvas-wrapper.space-pan.panning { cursor: grabbing !important; }
+    #loupe {
+      position: fixed;
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(0,0,0,0.18);
+      box-shadow: 0 6px 28px rgba(0,0,0,0.18), inset 0 0 0 1.5px rgba(255,255,255,0.55);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+      background: #fff;
+    }
+    #loupe canvas { display: block; }
+    #grid-canvas {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ── Zoom HUD ── */
+    #zoom-hud {
+      position: absolute;
+      bottom: 14px; right: 14px;
+      background: rgba(0,0,0,0.48);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #fff;
+      font-size: 12px; font-weight: 500;
+      letter-spacing: -0.2px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      user-select: none;
+    }
+    #zoom-hud.visible { opacity: 1; }
+    #zoom-hud.fading { opacity: 0; transition: opacity 0.6s; }
+
+    /* ── Drop overlay ── */
+    #drop-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px;
+      pointer-events: auto;
+      z-index: 50;
+      background: #f0f0f0;
+    }
+    #drop-overlay.hidden { display: none; }
+    #drop-icon { font-size: 52px; opacity: 0.2; }
+    #drop-text { font-size: 15px; color: #8e8e93; text-align: center; line-height: 1.6; }
+
+    /* ── Status bar ── */
+    #statusbar {
+      background: #ffffff;
+      border-top: 1px solid #e5e7eb;
+      padding: 4px 16px;
+      font-size: 11px;
+      color: #9ca3af;
+      display: flex;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
+      padding: 16px;
+    }
+    .modal {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px 22px;
+      width: 340px;
+      max-width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px #e5e7eb;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal .btn-row {
+      position: sticky;
+      bottom: 0;
+      background: #fff;
+      padding-top: 10px;
+      margin-top: 6px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .modal h2 { color: #2d2d2d; margin-bottom: 12px; font-size: 16px; font-weight: 700; }
+    .modal p { font-size: 13px; color: #6b7280; margin-bottom: 12px; line-height: 1.5; }
+    .modal input, .modal select {
+      width: 100%; padding: 8px 11px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px; color: #2d2d2d; font-size: 14px;
+      margin-bottom: 10px; font-family: inherit;
+      transition: border-color 0.3s;
+    }
+    .modal input:focus, .modal select:focus {
+      outline: none; border-color: #8B3DFF; background: #fff;
+    }
+    .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+    .modal .btn-row button {
+      padding: 7px 16px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 500;
+    }
+    #modal-ok { background: #8B3DFF !important; color: #fff !important; }
+    #modal-ok:hover { background: #7B2FBE !important; }
+
+    .save-load-option {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; border-radius: 8px;
+      border: 1px solid #e5e7eb; background: #f9fafb;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .save-load-option:hover {
+      border-color: #8B3DFF; background: #f5f0ff;
+      box-shadow: 0 0 0 1px #8B3DFF;
+    }
+    .slo-icon {
+      flex-shrink: 0; width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; border-radius: 8px;
+      border: 1px solid #e5e7eb; color: #6b7280;
+    }
+    .save-load-option:hover .slo-icon { border-color: #c4b5fd; color: #8B3DFF; }
+    .slo-text { flex: 1; font-size: 13px; color: #2d2d2d; line-height: 1.3; }
+    .slo-text strong { font-weight: 600; }
+    .slo-desc { font-size: 11px; color: #9ca3af; }
+
+    input[type="file"] { position: absolute; width: 0; height: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+    label.file-trigger { cursor: pointer; -webkit-tap-highlight-color: rgba(45,45,45,0.15); }
+
+    /* ── Compact ref-status ── */
+    #ref-status {
+      font-size: 12px;
+      color: #9ca3af;
+      line-height: 1.5;
+    }
+    .ref-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .ref-status-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      flex: 1;
+      min-width: 0;
+    }
+    .ref-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #16a34a;
+      white-space: nowrap;
+    }
+    .ref-label.unset { color: #9ca3af; font-weight: 400; }
+    .ref-metrics {
+      font-size: 10.5px;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ref-metrics b { color: #2d2d2d; }
+    .ref-detail-btn {
+      flex-shrink: 0;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 1.5px solid #d1d5db;
+      background: #f9fafb;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s;
+      padding: 0;
+      font-family: inherit;
+    }
+    .ref-detail-btn:hover { background: #8B3DFF; border-color: #8B3DFF; color: #fff; }
+
+    /* ── Accuracy Detail Panel (right drawer) ── */
+    #acc-panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 296px;
+      background: #ffffff;
+      border-left: 1px solid #e5e7eb;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.08);
+      z-index: 400;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    #acc-panel.open { transform: translateX(0); }
+    #acc-panel-head {
+      position: sticky; top: 0;
+      background: #ffffff;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 1;
+    }
+    #acc-panel-title {
+      font-size: 14px; font-weight: 700; color: #2d2d2d; letter-spacing: -0.2px;
+    }
+    #acc-panel-close {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: #f3f4f6; border: 1px solid #e5e7eb;
+      color: #6b7280; font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s; padding: 0; font-family: inherit;
+    }
+    #acc-panel-close:hover { background: #8B3DFF; border-color: #8B3DFF; color: #fff; }
+    #acc-panel-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+    .acc-section { display: flex; flex-direction: column; gap: 4px; }
+    .acc-section-title {
+      font-size: 9.5px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+    .acc-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      font-size: 11.5px;
+    }
+    .acc-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 3px 0;
+      border-bottom: 1px solid #f3f4f6;
+      color: #6b7280;
+    }
+    .acc-row:last-child { border-bottom: none; }
+    .acc-row b { color: #2d2d2d; font-weight: 600; }
+    .acc-total {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 6px; padding: 7px 10px;
+      background: #f3f4f6; border-radius: 8px;
+      font-size: 12px; color: #2d2d2d; font-weight: 600;
+    }
+    .acc-goal-block {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 11px;
+      color: #2d2d2d;
+      line-height: 1.55;
+    }
+    .acc-goal-block.met {
+      background: #f0fdf4;
+      border-color: #86efac;
+    }
+    .acc-goal-block.impossible {
+      background: #fef2f2;
+      border-color: #fca5a5;
+    }
+
+    /* ── Welcome Onboarding ── */
+    .wob-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 3000;
+      transition: opacity 0.2s;
+    }
+    .wob-card {
+      background: #fff; border-radius: 16px;
+      width: 420px; max-width: 94vw;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.18), 0 0 0 1px #e5e7eb;
+      overflow: hidden;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .wob-progress {
+      height: 3px; background: #f3f4f6;
+      position: relative; overflow: hidden;
+    }
+    .wob-progress-bar {
+      height: 100%; background: #8B3DFF;
+      transition: width 0.35s cubic-bezier(.4,0,.2,1);
+      border-radius: 0 2px 2px 0;
+    }
+    .wob-body {
+      padding: 32px 28px 8px;
+      display: flex; flex-direction: column;
+      min-height: 300px;
+    }
+    .wob-icon {
+      font-size: 44px; line-height: 1;
+      margin-bottom: 14px; text-align: center;
+    }
+    .wob-title {
+      font-size: 20px; font-weight: 700; color: #2d2d2d;
+      letter-spacing: -0.3px; margin-bottom: 8px; text-align: center;
+    }
+    .wob-subtitle {
+      font-size: 13.5px; color: #6b7280; line-height: 1.6;
+      text-align: center; margin-bottom: 18px;
+    }
+    .wob-content { flex: 1; }
+    .wob-steps { display: flex; flex-direction: column; gap: 8px; }
+    .wob-step {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 11px 13px; background: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb;
+    }
+    .wob-step-ico { font-size: 22px; line-height: 1; flex-shrink: 0; margin-top: 1px; }
+    .wob-step-info { display: flex; flex-direction: column; gap: 1px; }
+    .wob-step-label { font-size: 13px; font-weight: 600; color: #2d2d2d; }
+    .wob-step-desc { font-size: 11.5px; color: #6b7280; line-height: 1.45; }
+    .wob-tip {
+      background: #f0fdf4; border: 1px solid #86efac;
+      border-radius: 8px; padding: 10px 13px;
+      font-size: 12px; color: #2d2d2d; line-height: 1.55;
+      margin-top: 10px;
+    }
+    .wob-tip.green {
+      background: #f0fdf4; border-color: #86efac;
+    }
+    .wob-tools {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-top: 4px;
+    }
+    .wob-tool {
+      display: flex; align-items: center; gap: 9px;
+      background: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb; padding: 9px 11px;
+    }
+    .wob-tool-ico { font-size: 20px; flex-shrink: 0; }
+    .wob-tool-label { font-size: 12.5px; font-weight: 600; color: #2d2d2d; }
+    .wob-tool-desc { font-size: 10.5px; color: #6b7280; }
+    .wob-foot {
+      padding: 16px 28px 26px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .wob-dots {
+      display: flex; gap: 6px; justify-content: center; margin-bottom: 4px;
+    }
+    .wob-dot {
+      height: 7px; border-radius: 4px; background: #d1d5db;
+      transition: all 0.3s cubic-bezier(.4,0,.2,1);
+      cursor: pointer; width: 7px;
+    }
+    .wob-dot.active { background: #8B3DFF; width: 20px; }
+    .wob-btn-row { display: flex; gap: 8px; }
+    .wob-btn-primary {
+      flex: 1; padding: 14px; background: #8B3DFF; color: #fff;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background 0.15s;
+    }
+    .wob-btn-primary:hover { background: #7B2FBE; }
+    .wob-btn-primary.green { background: #16a34a; }
+    .wob-btn-primary.green:hover { background: #15803d; }
+    .wob-btn-secondary {
+      flex: 1; padding: 14px; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb;
+      border-radius: 10px; font-size: 14px; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: background 0.3s;
+    }
+    .wob-btn-secondary:hover { background: #e5e5ea; }
+    .wob-btn-skip {
+      background: none; border: none; color: #8e8e93;
+      font-size: 13px; cursor: pointer; font-family: inherit;
+      padding: 4px; text-align: center; transition: color 0.12s;
+    }
+    .wob-btn-skip:hover { color: #636366; }
+    @keyframes wob-in {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* ── Help popover ── */
+    #help-popover {
+      position: fixed;
+      top: 56px; right: 10px;
+      width: 230px;
+      background: rgba(255,255,255,0.98);
+      border-radius: 12px;
+      padding: 14px 15px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+      z-index: 600;
+      font-size: 11.5px;
+      line-height: 1.6;
+      display: none;
+    }
+    #help-popover.open { display: block; }
+    .help-row { display: flex; gap: 8px; padding: 2px 0; }
+    .help-key { color: #8B3DFF; font-weight: 600; min-width: 90px; flex-shrink: 0; }
+    .help-val { color: #3c3c43; }
+    #help-popover hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); margin: 7px 0; }
+
+    /* ── Whats-New Popover ── */
+    #whats-new-popover {
+      position: fixed;
+      top: 56px; right: 10px;
+      width: 260px;
+      background: rgba(255,255,255,0.98);
+      border-radius: 12px;
+      padding: 14px 15px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+      z-index: 600;
+      font-size: 11.5px;
+      line-height: 1.6;
+      display: none;
+    }
+    #whats-new-popover.open { display: block; }
+    #whats-new-popover h3 { font-size: 12px; font-weight: 700; color: #1d1d1f; margin: 0 0 8px 0; }
+    #whats-new-popover .rn-category { font-size: 10px; font-weight: 700; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0 3px 0; }
+    #whats-new-popover .rn-entry { color: #3c3c43; padding: 1px 0; }
+
+    /* ── Neu-Button Badge ── */
+    .btn-with-badge { position: relative; }
+    .btn-badge {
+      position: absolute; top: 2px; right: 2px;
+      width: 6px; height: 6px;
+      background: #ff3b30;
+      border-radius: 50%;
+      display: none;
+    }
+    .btn-badge.visible { display: block; }
+
+    /* ── Mobile Drawer Toggle ── */
+    #mobile-drawer-toggle {
+      display: none;
+      position: fixed;
+      bottom: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 500;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 22px;
+      padding: 8px 20px;
+      font-size: 13px; font-weight: 600; color: #8B3DFF;
+      cursor: pointer; font-family: inherit;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #mobile-drawer-toggle:active { transform: translateX(-50%) scale(0.95); }
+
+    /* ── Mobile Drawer Backdrop ── */
+    #drawer-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 550;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    #drawer-backdrop.visible { opacity: 1; }
+
+    /* ══════════════════════════════════════
+       RESPONSIVE — Tablet & Smartphone
+       ══════════════════════════════════════ */
+
+    @media (max-width: 900px) {
+      /* Header kompakter */
+      #header { height: 44px; padding: 0 10px; }
+      #header h1 { font-size: 14px; }
+      #header .header-actions { gap: 2px; }
+      #header .header-actions button,
+      #header .header-actions .file-trigger { padding: 5px 8px; font-size: 11px; }
+      #header .header-actions .header-divider { display: none; }
+
+      /* Toolbar: horizontal scrollbar, einzeilig */
+      #toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 5px 8px;
+        gap: 0;
+        scrollbar-width: none;        /* Firefox */
+      }
+      #toolbar::-webkit-scrollbar { display: none; }  /* Chrome/Safari */
+      .tool-group {
+        flex-shrink: 0;
+        padding: 0 6px;
+        gap: 2px;
+      }
+      .tool-group > label { display: none; }  /* Gruppenlabel ausblenden */
+
+      /* Sidebar wird Bottom-Drawer */
+      #sidebar {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        width: 100% !important;
+        max-height: 55vh;
+        border-right: none;
+        border-top: 1px solid rgba(0,0,0,0.12);
+        border-radius: 16px 16px 0 0;
+        z-index: 600;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 -8px 32px rgba(0,0,0,0.12);
+        padding: 8px 12px 24px;
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+      #sidebar.drawer-open { transform: translateY(0); }
+
+      /* Drawer-Griff oben */
+      #sidebar::before {
+        content: '';
+        display: block;
+        width: 36px; height: 4px;
+        background: rgba(0,0,0,0.2);
+        border-radius: 2px;
+        margin: 4px auto 10px;
+      }
+
+      /* Canvas: volle Breite */
+      #main { flex-direction: column; }
+      #canvas-wrapper { flex: 1; width: 100%; }
+
+      /* Toggle-Button anzeigen */
+      #mobile-drawer-toggle { display: block; }
+
+      /* Statusbar kompakter */
+      #statusbar { padding: 3px 10px; font-size: 10px; gap: 8px; }
+      #status-coords { display: none; }
+
+      /* Buttons: größere Touch-Ziele */
+      button { padding: 8px 12px; font-size: 13px; min-height: 36px; }
+      .color-dot { width: 28px; height: 28px; }
+      .lw-dot { width: 36px; height: 32px; }
+      .m-delete { font-size: 18px; padding: 4px; min-height: unset; }
+      .m-calc { font-size: 18px; padding: 4px; min-height: unset; }
+
+      .lib-item { padding: 6px 4px 5px; }
+      .lib-item svg { width: 40px; height: 40px; }
+
+      /* Accuracy-Panel: volle Breite */
+      #acc-panel { width: 100%; max-width: 340px; }
+
+      /* Zoom HUD: nicht vom Drawer verdeckt */
+      #zoom-hud { bottom: 60px; }
+    }
+
+    /* ── Smartphone (schmal) ── */
+    @media (max-width: 480px) {
+      #header h1 { font-size: 13px; }
+      button { padding: 7px 9px; font-size: 12px; }
+      .wob-card { border-radius: 16px; }
+      .wob-body { padding: 20px 18px 6px; min-height: 240px; }
+      .wob-tools { grid-template-columns: 1fr; }
+      .modal { width: 94vw; padding: 18px 16px; }
+
+      /* Sidebar: höher auf kleinen Screens */
+      #sidebar { max-height: 65vh; }
+    }
+
+    /* ── Drop-Hint nur Desktop ── */
+    @media (max-width: 900px) {
+      .drop-hint-desktop { display: none; }
+    }
+
+    /* ── Touch-Hilfsstil: verhindert iOS-Gummiband ── */
+    html.touch-device { overflow: hidden; position: fixed; width: 100%; height: 100%; }
+    html.touch-device body { position: fixed; width: 100%; height: 100%; }
+    html.touch-device #zoom-hud { font-size: 16px; }
+    html.touch-device #status-bar { font-size: 14px; }
+
+    /* ── Mobile Magnifier Circles (Start / End) ── */
+    .mobile-mag {
+      display: none;
+      position: fixed;
+      top: 12px;
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(0,0,0,0.22);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22), inset 0 0 0 1.5px rgba(255,255,255,0.5);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 9998;
+      background: #fff;
+    }
+    .mobile-mag canvas { display: block; }
+    .mobile-mag-label {
+      position: absolute;
+      bottom: 6px; left: 0; right: 0;
+      text-align: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      pointer-events: none;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    #mobile-mag-start { left: 12px; }
+    #mobile-mag-end { right: 12px; }
+    html.touch-device .mobile-mag.visible { display: block; }
+
+    /* ── Mobile Crosshair Overlay ── */
+    #mobile-crosshair {
+      display: none;
+      position: fixed;
+      width: 120px; height: 120px;
+      pointer-events: none;
+      z-index: 500;
+      transform: translate(-50%, -50%);
+    }
+    #mobile-crosshair.visible { display: block; }
+    #mobile-crosshair .ch-h,
+    #mobile-crosshair .ch-v {
+      position: absolute;
+      background: rgba(210,30,30,0.75);
+    }
+    #mobile-crosshair .ch-h {
+      left: 0; right: 0; top: 50%;
+      height: 1.5px;
+      transform: translateY(-0.75px);
+    }
+    #mobile-crosshair .ch-v {
+      top: 0; bottom: 0; left: 50%;
+      width: 1.5px;
+      transform: translateX(-0.75px);
+    }
+    #mobile-crosshair .ch-dot {
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 10px; height: 10px;
+      border: 1.5px solid rgba(210,30,30,0.9);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.5);
+    }
+
+    /* ── Mobile Finish Button ── */
+    #mobile-finish-btn {
+      display: none;
+      position: fixed;
+      bottom: 74px; right: 16px;
+      z-index: 495;
+      min-width: 56px; min-height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 24px;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(123,47,190,0.4);
+      cursor: pointer;
+      font-family: inherit;
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    html.touch-device #mobile-finish-btn.visible { display: flex; }
+
+    /* ── Mobile Bottom Toolbar ── */
+    #touch-toolbar {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 490;
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(0,0,0,0.08);
+      padding: 4px 4px;
+      padding-bottom: max(4px, env(safe-area-inset-bottom));
+      flex-direction: row;
+      justify-content: space-around;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #touch-toolbar::-webkit-scrollbar { display: none; }
+    html.touch-device #touch-toolbar { display: flex; }
+    #touch-toolbar button {
+      flex: 0 0 auto;
+      min-width: 44px; min-height: 44px;
+      border: none; background: transparent;
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 600; color: #666;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 2px 6px;
+      gap: 1px;
+    }
+    #touch-toolbar button svg { width: 22px; height: 22px; }
+    #touch-toolbar button.active { background: #f0ebff; color: #7B2FBE; }
+    #touch-toolbar button.sub-active { background: #fff3e0; color: #E65100; }
+    #touch-toolbar .tt-sep {
+      width: 1px; height: 28px; background: rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    html.touch-device #mobile-drawer-toggle {
+      bottom: 62px;
+    }
+    html.touch-device #sidebar.drawer-open ~ #touch-toolbar { display: none !important; }
+
+    /* ── Mobile Pipe-Type Selector ── */
+    #mobile-pipe-bar {
+      display: none;
+      position: fixed;
+      bottom: 56px;
+      bottom: calc(56px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      z-index: 489;
+      background: rgba(40,40,50,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 8px;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #mobile-pipe-bar::-webkit-scrollbar { display: none; }
+    html.touch-device #mobile-pipe-bar.visible { display: flex; }
+    #mobile-helpers-bar {
+      display: none;
+      position: fixed;
+      bottom: 56px;
+      bottom: calc(56px + env(safe-area-inset-bottom));
+      left: 0; right: 0;
+      z-index: 489;
+      background: rgba(40,40,50,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 6px 8px;
+      flex-direction: row;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #mobile-helpers-bar::-webkit-scrollbar { display: none; }
+    html.touch-device #mobile-helpers-bar.visible { display: flex; }
+    .mp-chip {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 10px;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 11px; font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .mp-chip .mp-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mp-chip.active {
+      background: rgba(255,255,255,0.25);
+      border-color: #fff;
+    }
+
+    /* ── Mobile Onboarding Overlay ── */
+    #mobile-onboarding {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0,0,0,0.82);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      gap: 28px;
+      color: #fff;
+      font-family: inherit;
+    }
+    #mobile-onboarding.visible { display: flex; }
+    #mobile-onboarding .ob-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      max-width: 320px;
+    }
+    #mobile-onboarding .ob-num {
+      flex: 0 0 auto;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #mobile-onboarding .ob-text {
+      font-size: 15px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.92);
+    }
+    #mobile-onboarding .ob-text strong { color: #fff; }
+    #mobile-onboarding .ob-dismiss {
+      margin-top: 8px;
+      padding: 12px 36px;
+      border: none;
+      border-radius: 12px;
+      background: #7B2FBE;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #mobile-onboarding .ob-dismiss:active { opacity: 0.8; }
+
+    @media (orientation: landscape) {
+      #touch-toolbar button span { display: none; }
+      #touch-toolbar button { min-width: 40px; padding: 4px; }
+    }
+
+    /* ── Mobile: Header + Toolbar + Statusbar + Drawer-Toggle ausblenden ── */
+    html.touch-device #header { display: none !important; }
+    html.touch-device #toolbar { display: none !important; }
+    html.touch-device #statusbar { display: none !important; }
+    html.touch-device #mobile-drawer-toggle { display: none !important; }
+
+    /* ── Mobile Drei-Punkte-Menü ── */
+    #mobile-menu-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 9000;
+    }
+    #mobile-menu-backdrop.visible { display: block; }
+
+    #mobile-menu {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 9001;
+      background: #252627;
+      border-radius: 16px 16px 0 0;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      max-height: 70vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      transform: translateY(100%);
+      transition: transform 0.25s ease-out;
+    }
+    #mobile-menu.visible {
+      display: block;
+      transform: translateY(0);
+    }
+    #mobile-menu .mm-handle {
+      width: 36px; height: 4px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 2px;
+      margin: 0 auto 12px;
+    }
+    #mobile-menu .mm-section {
+      margin-bottom: 12px;
+    }
+    #mobile-menu .mm-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+      padding-left: 4px;
+    }
+    #mobile-menu .mm-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #mobile-menu .mm-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      color: #ccc;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      min-height: 44px;
+    }
+    #mobile-menu .mm-btn:active { background: rgba(255,255,255,0.18); color: #fff; }
+    #mobile-menu .mm-btn.danger { color: #ff6b6b; }
+    #mobile-menu .mm-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    #mobile-menu .mm-color-row {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    }
+    #mobile-menu .mm-color-dot {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    #mobile-menu .mm-color-dot.active { border-color: #fff; }
+    #mobile-menu .mm-lw-row {
+      display: flex; gap: 6px; align-items: center;
+    }
+    #mobile-menu .mm-lw-dot {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    #mobile-menu .mm-lw-dot.active { border-color: #7B2FBE; background: rgba(123,47,190,0.2); }
+    #mobile-menu .mm-lw-dot svg { color: #ccc; }
+
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Planer</h1>
+  <span id="header-sub">Luftbild · Maßstab · Messung</span>
+  <div class="header-actions">
+    <label for="file-input" class="file-trigger" id="btn-upload" title="Bild oder PDF laden"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bild laden</label>
+    <input type="file" id="file-input" accept="image/*,application/pdf" />
+    <button id="btn-central-save" title="Speichern / Exportieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
+    <button id="btn-central-load" title="Laden / Importieren"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
+    <input type="file" id="json-input" accept=".json" style="display:none;" />
+    <!-- Hidden elements kept for compatibility -->
+    <button id="btn-save-json" style="display:none;"></button>
+    <button id="btn-load-json" style="display:none;"></button>
+    <button id="btn-save-pdf" style="display:none;"></button>
+    <button id="btn-save-png" style="display:none;"></button>
+    <div class="header-divider"></div>
+    <button id="btn-undo" title="Rückgängig (Ctrl+Z)" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+    <button id="btn-redo" title="Wiederholen (Ctrl+Y)" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+    <button id="btn-clear-all" class="danger" title="Alles löschen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    <div class="header-divider"></div>
+    <button id="btn-bug" title="Fehler melden"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></button>
+    <span class="btn-with-badge">
+      <button id="btn-whats-new" title="Was ist neu?"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+      <span class="btn-badge" id="whats-new-badge"></span>
+    </span>
+    <button id="btn-help" title="Tastenkürzel & Hilfe"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+  </div>
+</div>
+
+<div id="toolbar">
+
+  <!-- Zeile 1: Werkzeuge + Hilfslinien + Leitungstyp -->
+  <div class="toolbar-row">
+    <div class="tool-group">
+      <button id="btn-select" class="active" title="Auswählen / Verschieben"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg></span> Auswahl</button>
+      <button id="btn-label" title="Freie Beschriftung – Doppelklick zum Bearbeiten"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></span> Label</button>
+      <button id="btn-ref" title="Maßstab über bekannte Strecke setzen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 12h4"/></svg></span> Maßstab</button>
+    </div>
+    <div class="tool-group" id="ref-guide-group">
+      <button id="btn-pipe-ref-line" title="Hilfslinie setzen – zeigt Abstände beim Zeichnen (2 Klicks)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" stroke-dasharray="4 2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span> Hilfslinie</button>
+      <button id="btn-pipe-ref-point" title="Hilfspunkt setzen – zeigt Abstände beim Zeichnen (1 Klick)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></span> Hilfspunkt</button>
+    </div>
+    <div class="tool-group">
+      <button id="btn-distance" title="Distanz messen (2 Klicks)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2 8V2h6l13.3 13.3z"/><line x1="14" y1="13" x2="11" y2="10"/></svg></span> Distanz</button>
+      <button id="btn-area" title="Polygon-Fläche (Doppelklick zum Abschluss)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></span> Fläche</button>
+      <button id="btn-circle" title="Kreis: Klick = Mittelpunkt, 2. Klick = Radius"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg></span> Kreis</button>
+      <button id="btn-arc" title="Kreisabschnitt: 1. Klick = Mitte, 2. Klick = Startwinkel, 3. Klick = Endwinkel"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2"/><path d="M12 2v10l7.07 7.07"/></svg></span> Bogen</button>
+      <button id="btn-pipe" title="Leitung einzeichnen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16"/><path d="M4 12h12"/><circle cx="20" cy="12" r="2"/><path d="M4 8h8"/></svg></span> Leitung</button>
+    </div>
+    <div class="tool-group" id="pipe-type-group" style="display:none">
+      <label>Leitungstyp</label>
+      <select id="pipe-type-select"></select>
+      <label>Tiefe (cm)</label>
+      <input type="number" id="pipe-depth-input" value="" min="0" max="500" placeholder="z.B. 80" title="Verlegetiefe in cm" />
+      <label style="font-size:11px;margin-left:6px">NW</label>
+      <input type="text" id="pipe-nennweite-input" value="" placeholder="z.B. DN100"
+        title="Nennweite (optional)" style="width:60px;font-size:11px;padding:3px 6px;
+        border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;" />
+    </div>
+  </div>
+
+  <!-- Zeile 2: Formatierungen -->
+  <div class="toolbar-row">
+    <div class="tool-group">
+      <label>Farbe</label>
+      <div class="color-row" id="color-picker">
+        <div class="color-dot active" style="background:#4ecca3" data-color="#4ecca3"></div>
+        <div class="color-dot" style="background:#e74c3c" data-color="#e74c3c"></div>
+        <div class="color-dot" style="background:#f39c12" data-color="#f39c12"></div>
+        <div class="color-dot" style="background:#3498db" data-color="#3498db"></div>
+        <div class="color-dot" style="background:#9b59b6" data-color="#9b59b6"></div>
+        <div class="color-dot" style="background:#e67e22" data-color="#e67e22"></div>
+        <div class="color-dot" style="background:#ffffff" data-color="#ffffff"></div>
+      </div>
+    </div>
+    <div class="tool-group">
+      <label>Schrift</label>
+      <input type="number" id="font-size-input" value="6" min="6" max="72" title="Schriftgröße" />
+      <button id="btn-label-bg" class="active" title="Maße auf weißem Hintergrund mit schwarzer Schrift"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h10v10H7z" fill="currentColor" opacity="0.15"/></svg></span> BG: Hell</button>
+    </div>
+    <div class="tool-group">
+      <label>Linie</label>
+      <div class="lw-row" id="line-width-picker">
+        <div class="lw-dot active" data-lw="1" title="1 px"><svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="1"/></svg></div>
+        <div class="lw-dot" data-lw="2" title="2 px"><svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="2"/></svg></div>
+        <div class="lw-dot" data-lw="3" title="3 px"><svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="3"/></svg></div>
+        <div class="lw-dot" data-lw="5" title="5 px"><svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="5"/></svg></div>
+        <div class="lw-dot" data-lw="8" title="8 px"><svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="8"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="main">
+  <div id="sidebar">
+  <div id="sidebar-resize-handle" title="Sidebar-Breite anpassen"></div>
+
+    <!-- Maßstab -->
+    <div class="acc-section">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 12h4"/></svg></span> Maßstab</span>
+        <div class="acc-header-right">
+          <span class="acc-chevron">▼</span>
+        </div>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="font-cluster-row-inline"><label>Schriftgröße</label><input class="font-cluster-input" type="number" id="fs-ref" value="6" min="4" max="72" title="Schriftgröße Referenzmaße" /></div>
+          <div class="panel" style="display:flex;flex-direction:column;gap:0;">
+            <div id="ref-status">
+              <span class="scale-unset-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Maßstab nicht gesetzt</span>
+              <div class="scale-unset-hint">Referenz-Werkzeug benutzen oder Bild mit GPS-Daten laden.</div>
+            </div>
+            <div id="meta-panel" style="display:none">
+              <div style="border-top:1px solid #e5e7eb;margin:8px 0;"></div>
+              <div id="meta-content"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messungen -->
+    <div class="acc-section" id="acc-messungen">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2 8V2h6l13.3 13.3z"/><line x1="14" y1="13" x2="11" y2="10"/></svg><span class="acc-badge" id="badge-messungen"></span></span> Messungen</span>
+        <div class="acc-header-right">
+          <span class="acc-chevron">▼</span>
+        </div>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="font-cluster-row-inline"><label>Schriftgröße</label><input class="font-cluster-input" type="number" id="fs-measure" value="6" min="4" max="72" title="Schriftgröße Maße" /></div>
+          <div id="measurements-list">
+            <div style="font-size:11px;color:#8e8e93;padding:2px 0;">Noch keine Messungen</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leitungen -->
+    <div class="acc-section" id="acc-leitungen">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16"/><path d="M4 12h12"/><circle cx="20" cy="12" r="2"/><path d="M4 8h8"/></svg><span class="acc-badge" id="badge-leitungen"></span></span> Leitungen</span>
+        <span class="acc-chevron">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="panel">
+            <input type="file" id="leitungen-import-input" accept=".json" style="display:none;" />
+            <div class="pipe-layer-header">
+              <span style="font-size:11px;color:#636366;">Ebene</span>
+              <button id="btn-pipe-layer-toggle" class="pipe-layer-toggle-btn" onclick="togglePipeLayer()">Sichtbar</button>
+            </div>
+            <div id="pipe-layer-list">
+              <div style="font-size:11px;color:#8e8e93;padding:2px 0;">Noch keine Leitungen – Werkzeug <span style="color:#8B3DFF;cursor:pointer;" onclick="setTool('pipe')">&bdquo;Leitung&ldquo;</span> verwenden</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bibliothek -->
+    <div class="acc-section">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span> Bibliothek</span>
+        <div class="acc-header-right">
+          <span class="acc-chevron">▼</span>
+        </div>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="font-cluster-row-inline"><label>Schriftgröße</label><input class="font-cluster-input" type="number" id="fs-label" value="6" min="4" max="72" title="Schriftgröße freie Labels" /></div>
+          <div class="custom-lib-bar">
+            <button id="btn-lib-folder" onclick="linkCustomLibFolder()" title="Ordner auf dem Gerät verknüpfen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span> Ordner</button>
+            <button onclick="uploadCustomLibFiles()" title="SVG / PNG direkt hochladen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span> Upload</button>
+            <button onclick="refreshFromDir()" title="Ordner neu einlesen" id="btn-lib-refresh" style="flex:0;padding:4px 8px;"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span></button>
+          </div>
+          <div class="lib-cats" id="lib-cats"></div>
+          <div class="lib-grid" id="lib-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hilfslinien -->
+    <div class="acc-section" id="acc-hilfslinien">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" stroke-dasharray="4 2"/><line x1="4" y1="12" x2="20" y2="12"/></svg><span class="acc-badge" id="badge-hilfslinien"></span></span> Hilfslinien</span>
+        <div class="acc-header-right">
+          <span class="acc-chevron">▼</span>
+        </div>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="font-cluster-row-inline"><label>Schriftgröße</label><input class="font-cluster-input" type="number" id="fs-guide" value="6" min="4" max="72" title="Schriftgröße Hilfslinien / Hilfspunkte" /></div>
+          <div class="panel">
+            <div id="pipe-ref-list">
+              <div style="font-size:10px;color:#888;padding:2px 0;">Keine Hilfslinien gesetzt</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Raster -->
+    <div class="acc-section">
+      <div class="acc-header" onclick="toggleAcc(this)">
+        <span class="acc-title"><span class="acc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></span> Raster</span>
+        <span class="acc-chevron">▼</span>
+      </div>
+      <div class="acc-body">
+        <div class="acc-body-inner">
+          <div class="panel">
+            <div class="pipe-layer-header">
+              <span style="font-size:11px;color:#636366;">Maßstabsraster</span>
+              <button id="btn-grid-toggle" class="pipe-layer-toggle-btn hidden-layer" onclick="toggleGrid()">Ausgeblendet</button>
+            </div>
+            <div id="grid-info" style="font-size:10.5px;color:#8e8e93;margin-top:2px;">Kein Maßstab gesetzt</div>
+            <div id="grid-controls" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:10.5px;color:#636366;width:62px;flex-shrink:0;">Abstand</label>
+                <select id="grid-step-select" onchange="setGridStep(this.value)" style="flex:1;font-size:11px;padding:3px 4px;border:1px solid #e5e7eb;border-radius:4px;background:#f9fafb;">
+                  <option value="0">Automatisch</option>
+                  <option value="0.1">10 cm</option>
+                  <option value="0.25">25 cm</option>
+                  <option value="0.5">50 cm</option>
+                  <option value="1">1 m</option>
+                  <option value="2">2 m</option>
+                  <option value="5">5 m</option>
+                  <option value="10">10 m</option>
+                  <option value="25">25 m</option>
+                  <option value="50">50 m</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:10.5px;color:#636366;width:62px;flex-shrink:0;">Farbe</label>
+                <input type="color" id="grid-color-input" value="#ffffff" onchange="setGridColor(this.value)" style="width:28px;height:22px;padding:0;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;background:none;" />
+                <input type="range" id="grid-opacity-range" min="5" max="100" value="28" oninput="setGridOpacity(this.value)" style="flex:1;accent-color:#8B3DFF;" />
+                <span id="grid-opacity-label" style="font-size:10px;color:#9ca3af;width:28px;text-align:right;">28%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="canvas-wrapper">
+    <canvas id="c"></canvas>
+    <canvas id="grid-canvas"></canvas>
+    <div id="zoom-hud">100%</div>
+    <div id="drop-overlay">
+      <div id="drop-icon" style="opacity:0.18;margin-bottom:14px;"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div id="drop-text" style="font-size:17px;font-weight:600;color:#3c3c43;margin-bottom:6px;">Bild oder PDF laden</div>
+      <div style="font-size:13px;color:#8e8e93;">
+        <label for="file-input" class="file-trigger"
+          style="color:#8B3DFF;font-weight:600;font-size:15px;padding:12px 20px;display:inline-block;">
+          Datei auswählen
+        </label>
+        <span class="drop-hint-desktop" style="display:block;margin-top:4px;font-size:12px;"> oder hierher ziehen</span>
+      </div>
+      <div style="margin-top:16px;">
+        <button id="btn-how-it-works"
+          style="padding:12px 24px;background:rgba(139,61,255,0.1);color:#8B3DFF;border:none;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:rgba(139,61,255,0.15);">
+          Wie funktioniert das?
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="drawer-backdrop"></div>
+<button id="mobile-drawer-toggle">Messungen & Bibliothek ▲</button>
+
+<div id="mobile-mag-start" class="mobile-mag"><span class="mobile-mag-label">A</span></div>
+<div id="mobile-mag-end" class="mobile-mag"><span class="mobile-mag-label">B</span></div>
+<div id="mobile-crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
+<button id="mobile-finish-btn" title="Messung abschließen">✓</button>
+
+<div id="mobile-onboarding">
+  <div class="ob-step">
+    <span class="ob-num">1</span>
+    <span class="ob-text"><strong>Tippen</strong> — setzt einen Punkt mit Fadenkreuz</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">2</span>
+    <span class="ob-text"><strong>Ziehen</strong> — Punkt genau positionieren (Lupe zeigt Detail)</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">3</span>
+    <span class="ob-text"><strong>Loslassen</strong> — Punkt wird bestätigt</span>
+  </div>
+  <div class="ob-step">
+    <span class="ob-num">✓</span>
+    <span class="ob-text">Bei Fläche / Leitung: <strong>✓-Button</strong> drücken zum Abschließen</span>
+  </div>
+  <button class="ob-dismiss" id="mobile-ob-dismiss">Verstanden</button>
+</div>
+
+<div id="mobile-pipe-bar"></div>
+<div id="mobile-helpers-bar"></div>
+<div id="touch-toolbar">
+  <button id="tt-select" title="Auswahl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg><span>Auswahl</span></button>
+  <button id="tt-ref" title="Maßstab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/><path d="M10 12h4"/></svg><span>Maßstab</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-distance" title="Distanz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2 8V2h6l13.3 13.3z"/><line x1="14" y1="13" x2="11" y2="10"/></svg><span>Distanz</span></button>
+  <button id="tt-area" title="Fläche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg><span>Fläche</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-pipe" title="Leitung"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16"/><path d="M4 12h12"/><circle cx="20" cy="12" r="2"/><path d="M4 8h8"/></svg><span>Leitung</span></button>
+  <button id="tt-helpers" title="Hilfselemente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg><span>Hilfs.</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-undo" title="Rückgängig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg><span>Undo</span></button>
+  <div class="tt-sep"></div>
+  <button id="tt-more" title="Menü"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg><span>Menü</span></button>
+</div>
+
+<!-- Mobile Drei-Punkte-Menü -->
+<div id="mobile-menu-backdrop"></div>
+<div id="mobile-menu">
+  <div class="mm-handle"></div>
+
+  <div class="mm-section">
+    <div class="mm-section-title">Datei</div>
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bild laden</button>
+      <button class="mm-btn" id="mm-save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Speichern</button>
+      <button class="mm-btn" id="mm-load"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Laden</button>
+    </div>
+  </div>
+
+  <div class="mm-section">
+    <div class="mm-section-title">Bearbeiten</div>
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg> Undo</button>
+      <button class="mm-btn" id="mm-redo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Redo</button>
+      <button class="mm-btn danger" id="mm-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Alles löschen</button>
+    </div>
+  </div>
+
+  <div class="mm-section">
+    <div class="mm-section-title">Farbe</div>
+    <div class="mm-color-row" id="mm-colors"></div>
+  </div>
+
+  <div class="mm-section">
+    <div class="mm-section-title">Linienstärke</div>
+    <div class="mm-lw-row" id="mm-linewidths"></div>
+  </div>
+
+  <div class="mm-section">
+    <div class="mm-row">
+      <button class="mm-btn" id="mm-drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg> Messungen & Bibliothek</button>
+      <button class="mm-btn" id="mm-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Hilfe</button>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="status-tool">Auswahl</span>
+  <span id="status-ref" style="color:#8e8e93">Maßstab: –</span>
+  <span id="status-hint" style="color:#8B3DFF"></span>
+  <span id="status-coords" style="margin-left:auto;color:#aeaeb2">x: 0, y: 0</span>
+  <span style="color:#ff3b30;font-size:10px;letter-spacing:0.2px;flex-shrink:0;">© Matthias.J.</span>
+  <span id="status-zoom" onclick="zoomToFit()" title="Klicken: Ansicht zurücksetzen"
+    style="color:#aeaeb2;cursor:pointer;border-radius:4px;padding:0 3px;transition:background 0.1s;"
+    onmouseenter="this.style.background='rgba(0,0,0,0.06)'" onmouseleave="this.style.background=''">100%</span>
+</div>
+
+<!-- Accuracy Detail Panel -->
+<div id="acc-panel">
+  <div id="acc-panel-head">
+    <span id="acc-panel-title">Messgenauigkeit</span>
+    <button id="acc-panel-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  </div>
+  <div id="acc-panel-body"></div>
+</div>
+
+<!-- Whats-New Popover -->
+<div id="whats-new-popover">
+  <h3>Was ist neu?</h3>
+  <div id="whats-new-content"></div>
+</div>
+
+<!-- Help Popover -->
+<div id="help-popover">
+  <button onclick="document.getElementById('help-popover').classList.remove('open'); showWelcomeOnboarding();"
+    style="width:100%;padding:9px 11px;background:#8B3DFF;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px;">
+    Kurzanleitung anzeigen
+  </button>
+  <div style="font-size:12px;font-weight:700;color:#1d1d1f;margin-bottom:8px;">Tastenkürzel</div>
+  <div class="help-row"><span class="help-key">Auswahl</span><span class="help-val">Klick + Ziehen</span></div>
+  <div class="help-row"><span class="help-key">Maßstab</span><span class="help-val">Ziehen → bekannte Strecke</span></div>
+  <div class="help-row"><span class="help-key">Distanz</span><span class="help-val">Start → Ende</span></div>
+  <div class="help-row"><span class="help-key">Fläche</span><span class="help-val">Klicken + Doppelklick</span></div>
+  <div class="help-row"><span class="help-key">Kreis</span><span class="help-val">Mitte → Radius</span></div>
+  <div class="help-row"><span class="help-key">Kreisabschn.</span><span class="help-val">3 Klicks</span></div>
+  <div class="help-row"><span class="help-key">Label</span><span class="help-val">Klick = neu · Doppelklick = bearbeiten</span></div>
+  <div class="help-row"><span class="help-key">Leitung</span><span class="help-val">Klicken + Doppelklick</span></div>
+  <hr>
+  <div class="help-row"><span class="help-key">Zoom</span><span class="help-val">Pinch / Cmd+Scroll</span></div>
+  <div class="help-row"><span class="help-key">Pan</span><span class="help-val">Scroll · Leertaste+Drag</span></div>
+  <div class="help-row"><span class="help-key">Fit</span><span class="help-val">Doppelklick · % klicken</span></div>
+  <div class="help-row"><span class="help-key">Löschen</span><span class="help-val">Auswählen → Entf</span></div>
+  <div class="help-row"><span class="help-key">Abbrechen</span><span class="help-val">Esc</span></div>
+</div>
+
+<!-- RELEASE_NOTES_DATA:{"version":"2026-03-25","entries":[{"cat":"Behoben","msg":"fix(planer): use calcLinePoints() and getCenterPoint() for reference coords"}]} -->
+<script type="module" src="/src/main.js"></script>
+</html>
