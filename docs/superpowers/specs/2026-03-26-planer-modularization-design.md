@@ -17,9 +17,12 @@ Split the monolithic `index-1.html` (~8700 lines) into ~30 ES modules with a Vit
 - **Vite** as dev server and bundler
 - **vite-plugin-singlefile** to inline all JS + CSS into one HTML file
 - CDN libraries (Fabric.js 5.3.1, jsPDF 2.5.1, PDF.js 3.11.174, exifr 7.1.3) stay as `<script>` tags in HTML — not bundled
+- Google Fonts `@import` stays in CSS as-is (requires internet, same as today)
 - `npm run dev` → Vite dev server with hot reload (localhost:5173)
 - `npm run build` → `dist/index.html` (single file, works via `file://`)
 - Build target: `es2020` (Safari 14+, Chrome 80+)
+
+**Note:** `file://` output requires internet for CDN scripts and fonts — this is identical to current behavior, no regression.
 
 ### Module Structure
 
@@ -27,10 +30,13 @@ Split the monolithic `index-1.html` (~8700 lines) into ~30 ES modules with a Vit
 planer/
 ├── index.html                  ← HTML skeleton + CSS (~1900 lines from monolith)
 ├── src/
-│   ├── main.js                 ← Entry: imports all modules, registers events, starts app
-│   ├── state.js                ← Central state object, PIPE_TYPES, measureId counter
-│   ├── canvas.js               ← Fabric.js Canvas instance, _safeHandler wrapper
-│   ├── undo.js                 ← getSnapshot, saveSnapshot, restoreSnapshot, undo, redo
+│   ├── main.js                 ← Entry: imports all, registers canvas events, keyboard, init
+│   ├── state.js                ← state object, PIPE_TYPES, measureId, CANVAS_SERIAL_PROPS,
+│   │                              _isTouchDevice, TOUCH_SCALE
+│   ├── canvas.js               ← Fabric.js Canvas instance, _safeHandler, pan/zoom
+│   │                              (setZoom, zoomToFit, startPan, stopPan, showZoomHUD)
+│   ├── undo.js                 ← history object, getSnapshot, saveSnapshot, restoreSnapshot,
+│   │                              undo, redo — accepts UI update callbacks (no circular imports)
 │   ├── tools/
 │   │   ├── tool-manager.js     ← setTool, requireScale, TOOL_NAMES, TOOL_HINTS, button init
 │   │   ├── select.js           ← Selection logic, pipe-edit entry point
@@ -39,32 +45,44 @@ planer/
 │   │   ├── area.js             ← Area measurement (polygon)
 │   │   ├── circle.js           ← Circle tool
 │   │   ├── arc.js              ← Arc/sector tool
-│   │   ├── pipe.js             ← Pipe drawing + editing + vertex handling
+│   │   ├── pipe.js             ← Pipe drawing + editing + vertex handling +
+│   │   │                          sendPipesToBack, offsetOverlappingPipes
 │   │   ├── pipe-refs.js        ← Hilfslinien/Hilfspunkte (create, remove, toggle, list)
-│   │   └── label.js            ← Label tool + editLabel
+│   │   └── label.js            ← Label tool, editLabel, updateLiveLabel, removeLiveLabel
 │   ├── ui/
-│   │   ├── sidebar.js          ← Accordion toggle, sidebar resize, measurement list
+│   │   ├── sidebar.js          ← Accordion toggle, sidebar resize, measurement list,
+│   │   │                          updatePipePanel, resizeLabelCluster
 │   │   ├── modals.js           ← createModal, showToast, showMeasurementToast
-│   │   ├── statusbar.js        ← Status bar updates, badge notifications
+│   │   ├── statusbar.js        ← Status bar updates, _notifyBadge
 │   │   ├── grid.js             ← Grid overlay rendering
 │   │   ├── pipe-legend.js      ← Pipe type legend display
-│   │   ├── pipe-guides.js      ← Distance-to-reference dim lines (compute, render, clear)
-│   │   └── materialrechner.js  ← Material calculator (data + UI)
+│   │   ├── pipe-guides.js      ← Dim-line compute + render (computeDimLine,
+│   │   │                          renderDimLinesForPipe, clearDimLinesForPipe)
+│   │   ├── pipe-assign.js      ← Assign mode (startAssignMode, endAssignMode,
+│   │   │                          toggleRefAssignment, confirmAssignMode)
+│   │   ├── materialrechner.js  ← MATERIALS data + calculator UI
+│   │   └── whats-new.js        ← Release notes parsing, renderWhatsNew, bug report modal
 │   ├── mobile/
-│   │   ├── touch.js            ← Touch capture, pinch/pan, point justification, magnifier
-│   │   ├── drawer.js           ← Mobile drawer, bottom toolbar, menu
-│   │   └── finish-btn.js       ← Finish button for multi-point operations
+│   │   ├── touch.js            ← Touch capture, pinch/pan, magnifier, crosshair, finish button
+│   │   └── drawer.js           ← Mobile drawer, bottom toolbar, menu
 │   ├── io/
-│   │   ├── image-loader.js     ← Image/PDF loading, EXIF reading, fit-to-screen
-│   │   ├── save-load.js        ← Project save/load (JSON format)
-│   │   ├── export.js           ← PDF/PNG export, pipe export/import workflow
+│   │   ├── image-loader.js     ← Image/PDF loading, fit-to-screen, drag-and-drop handler
+│   │   ├── photogrammetry.js   ← EXIF/SENSOR_DB, calcGSD, calcAccuracy,
+│   │   │                          flightRecommendation, accuracy detail panel
+│   │   ├── save-load.js        ← Project JSON save/load, save/load dialog UI
+│   │   ├── export.js           ← PDF/PNG export
+│   │   ├── pipe-transfer.js    ← Pipe export/import with anchor alignment
+│   │   │                          (_anchorExport, _anchorImport, handleLeitungenAlignClick)
 │   │   └── library.js          ← Built-in library + custom library (IndexedDB, File System API)
 │   ├── onboarding/
-│   │   └── onboarding.js       ← Welcome onboarding + reference tool onboarding
+│   │   ├── welcome.js          ← Welcome onboarding flow
+│   │   └── ref-onboarding.js   ← Reference tool onboarding flow
 │   └── utils/
-│       ├── geometry.js         ← pointToSegmentDist, projectPointOnLine, closestPointOnSegment
 │       ├── loupe.js            ← Desktop magnifier (loupe IIFE → module)
-│       └── helpers.js          ← addEndpointDot, addLabel, cancelDrawing, snapToPixel
+│       └── helpers.js          ← addEndpointDot, addLabel, cancelDrawing, snapToPixel,
+│                                  formatDistance, formatArea, formatErr, polygonArea, ptDist,
+│                                  addRefEndmarks, addTickMarks, pointToSegmentDist,
+│                                  projectPointOnLine, closestPointOnSegment
 ├── vite.config.js
 └── package.json
 ```
@@ -73,13 +91,17 @@ planer/
 
 #### Core Modules
 
-**`state.js`** — Single source of truth. Exports the `state` object, `PIPE_TYPES` constant, and `measureId` counter. Every module that needs state imports from here.
+**`state.js`** — Single source of truth. Exports: `state` object, `PIPE_TYPES`, `measureId` counter, `CANVAS_SERIAL_PROPS`, `_isTouchDevice`, `TOUCH_SCALE`. Every module that needs state imports from here.
 
-**`canvas.js`** — Creates and exports the Fabric.js `canvas` instance. Exports `_safeHandler()` for wrapping event callbacks. Depends on: `state.js` (for `CANVAS_SERIAL_PROPS`).
+**`canvas.js`** — Creates and exports the Fabric.js `canvas` instance. Exports `_safeHandler()` for wrapping event callbacks. Also contains pan/zoom logic (`setZoom`, `zoomToFit`, `startPan`, `stopPan`, `showZoomHUD`, wheel handler). Depends on: `state.js`.
 
-**`undo.js`** — Exports `getSnapshot()`, `saveSnapshot()`, `restoreSnapshot()`, `undo()`, `redo()`, `updateUndoRedoButtons()`. Depends on: `state.js`, `canvas.js`.
+**`undo.js`** — Exports `history` object, `getSnapshot()`, `saveSnapshot()`, `restoreSnapshot()`, `undo()`, `redo()`, `updateUndoRedoButtons()`.
 
-**`main.js`** — Entry point. Imports all modules, registers canvas event handlers (`mouse:down`, `mouse:move`, `object:modified` etc.), wires up DOM event listeners (buttons, keyboard shortcuts), calls initialization functions. This is the only file that knows about all modules.
+**Circular dependency prevention:** `restoreSnapshot` needs to call UI update functions (`updateRefStatus`, `updateMeasurementList`, `updatePipeLegend`, `updatePipeRefList`, `updatePipePanel`, `renderAllDimLines`). Instead of importing these directly, `undo.js` accepts a callback registry: `registerRestoreHook(fn)`. Each module calls `registerRestoreHook` with its own update function. `restoreSnapshot` iterates the hooks after restoring state. This keeps `undo.js` dependency-free.
+
+**`main.js`** — Entry point. Imports all modules, registers canvas event handlers (~300 lines of routing: `mouse:down`, `mouse:move`, `mouse:up`, `object:moving`, `object:modified`, `mouse:dblclick`), wires up DOM event listeners (buttons, keyboard shortcuts: Delete, Escape, Ctrl+Z/Y), calls initialization, handles window resize.
+
+**Inline `onclick` handlers:** The monolith uses inline `onclick` attributes in dynamically generated HTML (e.g., `onclick="removeMeasurement(${id})"`). These require global function access. Solution: each module that generates such HTML explicitly exposes its functions on `window` (e.g., `window.removeMeasurement = removeMeasurement`). This is pragmatic for migration — can be refactored to event delegation later.
 
 #### Tool Modules (`tools/`)
 
@@ -90,62 +112,69 @@ Each tool module exports its click/interaction handlers. All follow the same pat
 
 **`tool-manager.js`** — Exports `setTool()` which handles tool switching: button state, cursor, hints, mode cleanup. Imported by `main.js` and toolbar button handlers.
 
-**`pipe.js`** — Largest tool module. Includes pipe drawing, editing (startPipeEdit, endPipeEdit), vertex manipulation (insert, delete), and handle dragging (updatePipeFromHandles). Depends on: `pipe-refs.js` for reference data.
+**`pipe.js`** — Largest tool module (~350 lines). Includes pipe drawing, editing (startPipeEdit, endPipeEdit), vertex manipulation (insert, delete), handle dragging (updatePipeFromHandles), and z-ordering (`sendPipesToBack`, `offsetOverlappingPipes`). Depends on: `pipe-refs.js`.
 
 **`pipe-refs.js`** — Hilfslinien/Hilfspunkte management. Exports create/remove/toggle functions and `updatePipeRefList()`. Used by `pipe.js` and `pipe-guides.js`.
 
+**`label.js`** — Label tool, `editLabel`, `updateLiveLabel`, `removeLiveLabel` (floating measurement preview).
+
 #### UI Modules (`ui/`)
 
-**`sidebar.js`** — Accordion panel logic, sidebar resize handler, `updateMeasurementList()`. Imports `state.js` for measurement data.
+**`sidebar.js`** — Accordion panel logic (`toggleAcc`), sidebar resize handler, `updateMeasurementList()`, `updatePipePanel()`, `resizeLabelCluster()`. Imports `state.js` for measurement data.
 
-**`modals.js`** — Generic `createModal()` and `showToast()`. No state dependency — pure UI utilities.
+**`modals.js`** — Generic `createModal()`, `showToast()`, `showMeasurementToast()`. No state dependency — pure UI utilities.
 
-**`pipe-guides.js`** — The dim-line visualization system (~578 lines in monolith). Computes and renders distance annotations between pipes and reference lines. Depends on: `state.js`, `canvas.js`, `pipe-refs.js`.
+**`statusbar.js`** — Status bar text updates, `_notifyBadge()` for accordion header badges.
+
+**`pipe-guides.js`** — Dim-line computation and rendering (~350 lines after splitting). `computeDimLine`, `renderDimLinesForPipe`, `renderAllDimLines`, `clearDimLinesForPipe`, draggable foot handlers. Depends on: `state.js`, `canvas.js`, `pipe-refs.js`.
+
+**`pipe-assign.js`** — Assign mode (~180 lines): `startAssignMode`, `endAssignMode`, `confirmAssignMode`, `cancelAssignMode`, `toggleRefAssignment`, `directToggleRef`. Depends on: `state.js`, `canvas.js`, `pipe-refs.js`.
 
 **`grid.js`** — Self-contained grid overlay. Reads `state.scale` to compute grid spacing.
 
-**`materialrechner.js`** — Pure data (MATERIALS constant) + calculation UI. Minimal dependencies.
+**`materialrechner.js`** — MATERIALS constant + calculation UI (~430 lines, borderline — acceptable as single module since it's purely self-contained).
+
+**`whats-new.js`** — Release notes parsing from HTML comment, `renderWhatsNew`, popover toggle, bug report modal.
 
 #### Mobile Modules (`mobile/`)
 
-**`touch.js`** — Touch capture-phase handlers on `canvas.upperCanvasEl`, pinch-to-zoom, two-finger pan, point justification with magnifier, mobile crosshair. Depends on: `state.js`, `canvas.js`.
+**`touch.js`** — Touch capture-phase handlers on `canvas.upperCanvasEl`, pinch-to-zoom, two-finger pan, point justification with magnifier, mobile crosshair, finish button. Depends on: `state.js`, `canvas.js`.
 
-**`drawer.js`** — Mobile sidebar drawer, bottom toolbar, hamburger menu. Mostly DOM manipulation.
-
-**`finish-btn.js`** — Shows/hides the finish button for multi-point operations (area, pipe). Imports tool state.
+**`drawer.js`** — Mobile sidebar drawer, bottom toolbar, hamburger menu, orientation change handler. Mostly DOM manipulation.
 
 #### IO Modules (`io/`)
 
-**`image-loader.js`** — `loadImageFromDataUrl()`, `loadFileAuto()`, `loadPdf()`, EXIF parsing via exifr, photogrammetry calculations (`calcGSD`, `calcAccuracy`). Sets `state.backgroundImage`, `state.imgDisplayScale`, `state.scale`.
+**`image-loader.js`** — `loadImageFromDataUrl()`, `loadFileAuto()`, `loadPdf()`, fit-to-screen logic, drag-and-drop file handler. Sets `state.backgroundImage`, `state.imgDisplayScale`. (~150 lines)
+
+**`photogrammetry.js`** — SENSOR_DB, `lookupSensor`, `calcGSD`, `calcAccuracy`, `calcRequiredForTarget`, `calcFlightRecommendation`, `flightRecommendationTableHTML`, `showAccuracyDetail`, `hideAccuracyDetail`. (~350 lines)
 
 **`save-load.js`** — Project JSON save/load, the central save/load dialog UI.
 
-**`export.js`** — PDF export (via jsPDF), PNG export, pipe export/import workflow (anchor-based alignment).
+**`export.js`** — PDF export (via jsPDF), PNG export. (~160 lines)
+
+**`pipe-transfer.js`** — Pipe export/import with anchor-based alignment workflow (~525 lines). Contains `_anchorExport`, `_anchorImport` state machines, `handleLeitungenAlignClick`, `doExportLeitungen`, `doImportLeitungen`, banner UI. This is a complex self-contained workflow.
 
 **`library.js`** — Built-in SVG library (`LIBRARY` constant), custom library via IndexedDB/File System API.
 
 #### Utility Modules (`utils/`)
 
-**`geometry.js`** — Pure functions, no state dependency. `pointToSegmentDist()`, `projectPointOnLine()`, `closestPointOnSegment()`.
-
 **`loupe.js`** — Desktop magnifier. Currently an IIFE, becomes a module exporting `show()`, `hide()`, `update()`.
 
-**`helpers.js`** — `addEndpointDot()`, `addLabel()`, `cancelDrawing()`, `snapToPixel()`. Small utility functions used across tools.
+**`helpers.js`** — Pure functions + small canvas utilities: `addEndpointDot()`, `addLabel()`, `cancelDrawing()`, `snapToPixel()`, `formatDistance()`, `formatArea()`, `formatErr()`, `distErr_m()`, `areaRelErr_pct()`, `polygonArea()`, `ptDist()`, `addRefEndmarks()`, `addTickMarks()`, `pointToSegmentDist()`, `projectPointOnLine()`, `closestPointOnSegment()`.
 
 ### Dependency Graph (simplified)
 
 ```
 state.js  ←── everything
 canvas.js ←── everything that touches Fabric
-undo.js   ←── all tools (saveSnapshot), main.js
+undo.js   ←── all tools (saveSnapshot); accepts restore hooks, no UI imports
 modals.js ←── tools (createModal), io modules (showToast)
-geometry.js ←── pipe-guides.js, pipe.js, tools
-helpers.js ←── tools, io modules
+helpers.js ←── tools, io modules, pipe-guides
 
-main.js ──→ imports all, wires everything together
+main.js ──→ imports all, wires everything together, registers restore hooks
 ```
 
-No circular dependencies. `state.js` and `canvas.js` are leaf nodes (they don't import other app modules).
+No circular dependencies. `state.js` and `canvas.js` are leaf nodes (they don't import other app modules). `undo.js` uses a hook registry pattern to call UI updates without importing UI modules.
 
 ### CDN Libraries
 
@@ -167,42 +196,42 @@ Vite config declares these as external/global so they're not bundled.
 3. Remaining JS goes into `src/main.js` as-is (working baseline)
 
 ### Phase 2: Core Extraction
-4. Extract `state.js` (state object, PIPE_TYPES, measureId)
-5. Extract `canvas.js` (canvas creation, _safeHandler)
-6. Extract `undo.js` (snapshot system)
+4. Extract `state.js` (state object, PIPE_TYPES, measureId, CANVAS_SERIAL_PROPS, _isTouchDevice, TOUCH_SCALE)
+5. Extract `canvas.js` (canvas creation, _safeHandler, pan/zoom)
+6. Extract `undo.js` (history, snapshot system, restore hook registry)
 
 ### Phase 3: Loosely-Coupled Modules (easy wins)
-7. `utils/geometry.js` — pure functions
+7. `utils/helpers.js` — pure functions + small utilities
 8. `ui/materialrechner.js` — self-contained
 9. `ui/grid.js` — self-contained
 10. `utils/loupe.js` — IIFE → module
 11. `ui/modals.js` — createModal, showToast
-12. `onboarding/onboarding.js` — welcome + ref flows
+12. `onboarding/welcome.js` + `onboarding/ref-onboarding.js`
+13. `ui/whats-new.js` — release notes + bug report
 
 ### Phase 4: Tools
-13. `tools/tool-manager.js` — setTool + button init
-14. `tools/distance.js`, `tools/area.js`, `tools/circle.js`, `tools/arc.js` — simple tools
-15. `tools/label.js`
-16. `tools/ref.js` — scale calibration (depends on EXIF data)
-17. `tools/pipe-refs.js` — Hilfslinien
-18. `tools/pipe.js` — pipe drawing + editing (largest tool module)
-19. `tools/select.js` — selection routing
+14. `tools/tool-manager.js` — setTool + button init
+15. `tools/distance.js`, `tools/area.js`, `tools/circle.js`, `tools/arc.js` — simple tools
+16. `tools/label.js` — labels + live label
+17. `tools/ref.js` — scale calibration
+18. `tools/pipe-refs.js` — Hilfslinien
+19. `tools/pipe.js` — pipe drawing + editing (largest tool module)
+20. `tools/select.js` — selection routing
 
 ### Phase 5: Complex Subsystems
-20. `ui/pipe-guides.js` — dim-line system (~578 lines)
-21. `ui/pipe-legend.js` + `ui/sidebar.js` + `ui/statusbar.js`
-22. `io/image-loader.js` — image/PDF/EXIF
-23. `io/save-load.js` — project persistence
-24. `io/export.js` — PDF/PNG/pipe export
-25. `io/library.js` — built-in + custom library
+21. `ui/pipe-guides.js` + `ui/pipe-assign.js` — dim-lines + assign mode
+22. `ui/pipe-legend.js` + `ui/sidebar.js` + `ui/statusbar.js`
+23. `io/image-loader.js` + `io/photogrammetry.js`
+24. `io/save-load.js` — project persistence
+25. `io/export.js` + `io/pipe-transfer.js`
+26. `io/library.js` — built-in + custom library
 
 ### Phase 6: Mobile
-26. `mobile/touch.js` — touch capture, magnifier, pinch/pan
-27. `mobile/drawer.js` — mobile UI chrome
-28. `mobile/finish-btn.js`
+27. `mobile/touch.js` — touch capture, magnifier, pinch/pan, finish button
+28. `mobile/drawer.js` — mobile UI chrome + orientation handler
 
 ### Phase 7: Cleanup
-29. `main.js` contains only: imports, event registration, init calls
+29. `main.js` contains only: imports, event registration (~300 lines routing), keyboard handler, init calls, window resize
 30. Remove dead code, verify all paths work
 31. Final `npm run build` → test `dist/index.html` via `file://` and web server
 
