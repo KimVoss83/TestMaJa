@@ -1,4 +1,5 @@
 import { PIPE_TYPES, state, measureId, nextMeasureId, setMeasureId, CANVAS_SERIAL_PROPS, _isTouchDevice, TOUCH_SCALE } from './state.js';
+import { canvas, wrapper, _safeHandler, showZoomHUD, setZoom, zoomToFit, startPan, stopPan } from './canvas.js';
 
 // =========================================================
 // NOTIFICATION BADGES
@@ -14,17 +15,6 @@ function _notifyBadge(badgeId, sectionId, newCount, key) {
   }
   _prevCounts[key] = newCount;
 }
-
-// =========================================================
-// CANVAS
-// =========================================================
-const wrapper = document.getElementById('canvas-wrapper');
-const canvas = new fabric.Canvas('c', {
-  width: wrapper.clientWidth,
-  height: wrapper.clientHeight,
-  selection: true,
-  backgroundColor: '#a8e6cf',
-});
 
 // =========================================================
 // LIBRARY — 2D-Skizzen Vogelperspektive
@@ -1691,15 +1681,6 @@ function throttledRender() {
 // CANVAS EVENTS
 // =========================================================
 
-// Error boundary für Canvas-Event-Handler — verhindert, dass ein Fehler
-// in einem Handler die gesamte Event-Kette stillegt.
-function _safeHandler(fn) {
-  return function(opt) {
-    try { fn.call(this, opt); }
-    catch (e) { console.error('Canvas-Event-Handler Fehler:', e); }
-  };
-}
-
 canvas.on('mouse:move', _safeHandler(opt => {
   const p = canvas.getPointer(opt.e);
   document.getElementById('status-coords').textContent = `x: ${Math.round(p.x)}, y: ${Math.round(p.y)}`;
@@ -1990,49 +1971,6 @@ canvas.on('mouse:dblclick', _safeHandler(opt => {
 // PANNING & ZOOM  (Apple-style)
 // =========================================================
 
-// Zoom HUD
-let _zoomHudTimer = null;
-const _zoomHud = () => document.getElementById('zoom-hud');
-function showZoomHUD(z) {
-  const hud = _zoomHud();
-  const pct = Math.round(z * 100) + '%';
-  hud.textContent = pct;
-  hud.classList.remove('fading');
-  hud.classList.add('visible');
-  document.getElementById('status-zoom').textContent = pct;
-  clearTimeout(_zoomHudTimer);
-  _zoomHudTimer = setTimeout(() => {
-    hud.classList.add('fading');
-    setTimeout(() => hud.classList.remove('visible', 'fading'), 650);
-  }, 900);
-}
-
-function setZoom(z, point) {
-  z = Math.min(Math.max(z, 0.05), 20);
-  if (point && isFinite(point.x) && isFinite(point.y)) canvas.zoomToPoint(point, z);
-  else canvas.setZoom(z);
-  state.zoom = z;
-  showZoomHUD(z);
-}
-
-function zoomToFit() {
-  canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-  setZoom(1);
-}
-
-// Pan
-function startPan(e) {
-  state.panning = true;
-  state.lastPan = { x: e.clientX, y: e.clientY };
-  canvas.defaultCursor = 'grabbing';
-  wrapper.classList.add('panning');
-  _loupe.hide();
-}
-function stopPan() {
-  state.panning = false;
-  wrapper.classList.remove('panning');
-  if (!state.spacePan) canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
-}
 document.addEventListener('mousemove', e => {
   if (!state.panning) return;
   const dx = e.clientX - state.lastPan.x;
