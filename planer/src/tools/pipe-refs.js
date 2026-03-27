@@ -10,6 +10,9 @@ import { updatePipePanel, sendPipesToBack } from './pipe.js';
 // =========================================================
 let pipeRefId = 0;
 
+export function setPipeRefId(val) { pipeRefId = val; }
+export function resetPipeRefId() { pipeRefId = 0; }
+
 export const PIPE_REF_LINE_COLOR = '#FF9500';
 const PIPE_REF_POINT_COLOR = '#FF2D55';
 export const PIPE_REF_GUIDE_COLOR = 'rgba(255,59,48,0.6)';

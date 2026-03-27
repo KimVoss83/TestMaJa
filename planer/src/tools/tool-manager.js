@@ -202,4 +202,9 @@ export function initToolbar() {
     btnLabelBg.innerHTML = _bgIcon + (state.labelBg ? ' BG: Hell' : ' BG: Dunkel');
     btnLabelBg.classList.toggle('active', state.labelBg);
   };
+  // Expose sync helper so save-load.js can update the button after loading a project
+  window._syncLabelBgBtn = () => {
+    btnLabelBg.innerHTML = _bgIcon + (state.labelBg ? ' BG: Hell' : ' BG: Dunkel');
+    btnLabelBg.classList.toggle('active', state.labelBg);
+  };
 }
