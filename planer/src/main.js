@@ -1,6 +1,8 @@
 import { PIPE_TYPES, state, measureId, nextMeasureId, setMeasureId, CANVAS_SERIAL_PROPS, _isTouchDevice, TOUCH_SCALE } from './state.js';
 import { canvas, wrapper, _safeHandler, showZoomHUD, setZoom, zoomToFit, startPan, stopPan } from './canvas.js';
 import { history, registerRestoreHook, getSnapshot, saveSnapshot, restoreSnapshot, undo, redo, updateUndoRedoButtons } from './undo.js';
+import { showToast, haptic, showMeasurementToast, createModal } from './ui/modals.js';
+import { snapToPixel, projectPointOnLine, closestPointOnSegment, addLabel, addEndpointDot, addRefEndmarks, addTickMarks, ptDist, pointToSegmentDist, polygonArea, formatDistance, formatArea, formatErr } from './utils/helpers.js';
 
 // =========================================================
 // NOTIFICATION BADGES
@@ -395,66 +397,6 @@ function requireScale() {
   return false;
 }
 
-const TOAST_COLORS = {
-  error:   'rgba(220,38,38,0.93)',
-  warning: 'rgba(217,119,6,0.93)',
-  success: 'rgba(22,163,74,0.93)',
-  info:    'rgba(37,99,235,0.93)',
-};
-function showToast(msg, type = 'error') {
-  let t = document.getElementById('toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.id = 'toast';
-    t.style.cssText = `position:fixed;bottom:48px;left:50%;transform:translateX(-50%);
-      color:#fff;padding:9px 22px;border-radius:22px;
-      font-size:13px;font-weight:600;z-index:2000;pointer-events:none;
-      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-      box-shadow:0 8px 24px rgba(0,0,0,0.18);transition:opacity 0.3s,background 0.2s;
-      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-0.2px;`;
-    document.body.appendChild(t);
-  }
-  t.style.background = TOAST_COLORS[type] || TOAST_COLORS.error;
-  t.textContent = msg;
-  t.style.opacity = '1';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.style.opacity = '0'; }, type === 'error' ? 4500 : 3000);
-}
-
-// Haptisches Feedback (nur Mobile, nur wenn unterstützt)
-function haptic(style = 'light') {
-  if (!navigator.vibrate) return;
-  switch (style) {
-    case 'light':  navigator.vibrate(10); break;
-    case 'medium': navigator.vibrate(20); break;
-    case 'heavy':  navigator.vibrate([15, 30, 15]); break;
-  }
-}
-
-// Messergebnis als großen Toast anzeigen (nur Mobile)
-function showMeasurementToast(text) {
-  if (typeof _isTouchDevice !== 'undefined' && !_isTouchDevice) return;
-  let t = document.getElementById('measure-toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.id = 'measure-toast';
-    t.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.8);
-      color:#fff;padding:16px 32px;border-radius:16px;font-size:28px;font-weight:700;
-      z-index:2001;pointer-events:none;background:rgba(0,0,0,0.75);
-      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-      box-shadow:0 8px 32px rgba(0,0,0,0.3);transition:opacity 0.4s,transform 0.3s;
-      font-family:'DM Sans',-apple-system,sans-serif;letter-spacing:-0.5px;opacity:0;`;
-    document.body.appendChild(t);
-  }
-  t.textContent = text;
-  t.style.opacity = '1';
-  t.style.transform = 'translate(-50%,-50%) scale(1)';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => {
-    t.style.opacity = '0';
-    t.style.transform = 'translate(-50%,-50%) scale(0.8)';
-  }, 1800);
-}
 
 function updateMeasureButtons() {
   MEASURE_TOOLS.forEach(id => {
@@ -1653,16 +1595,6 @@ canvas.on('mouse:move', _safeHandler(opt => {
 
 canvas.on('mouse:out', () => { _loupe.hide(); });
 
-// Snap-to-Pixel: Rastet Koordinaten auf das nächste Original-Bildpixel ein,
-// damit Messungen wiederholbar und konsistent sind.
-function snapToPixel(p) {
-  const img = state.backgroundImage;
-  if (!img) return p;
-  const s = state.imgDisplayScale;
-  const origX = Math.round((p.x - img.left) / s);
-  const origY = Math.round((p.y - img.top) / s);
-  return { x: img.left + origX * s, y: img.top + origY * s };
-}
 
 canvas.on('mouse:down', _safeHandler(opt => {
   if (_touchSuppressClick) { _touchSuppressClick = false; return; }
@@ -2912,28 +2844,6 @@ function showPipeDistanceGuides(cursorPt) {
   state.pipeSnapLines = guides;
 }
 
-// Project point p onto line defined by ref {x1,y1,x2,y2}
-// Returns { point: {x,y}, dist, t }
-function projectPointOnLine(p, ref) {
-  const dx = ref.x2 - ref.x1, dy = ref.y2 - ref.y1;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-9) return { point: { x: ref.x1, y: ref.y1 }, dist: Math.hypot(p.x - ref.x1, p.y - ref.y1), t: 0 };
-  // Project onto infinite line (not clamped to segment)
-  const t = ((p.x - ref.x1) * dx + (p.y - ref.y1) * dy) / lenSq;
-  const projX = ref.x1 + t * dx;
-  const projY = ref.y1 + t * dy;
-  return { point: { x: projX, y: projY }, dist: Math.hypot(p.x - projX, p.y - projY), t };
-}
-
-// ─── Geometry helpers für Maßlinien ───────────────────────
-// Gibt den Punkt auf Segment [a,b] der p am nächsten liegt (geclampt)
-function closestPointOnSegment(p, a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-9) return { x: a.x, y: a.y };
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
-  return { x: a.x + t * dx, y: a.y + t * dy };
-}
 
 // Kürzester Abstand zwischen zwei Segmenten (beide geclampt)
 // Gibt { footA, footB, dist } zurück
@@ -4105,111 +4015,6 @@ function removeLiveLabel() {
   }
 }
 
-// =========================================================
-// HELPERS
-// =========================================================
-function addLabel(x, y, text, color, measureId, userSelectable = false) {
-  const isLight = state.labelBg;
-  const sel = userSelectable || measureId !== null;
-  const txt = new fabric.Text(text, {
-    left: x, top: y,
-    fontSize: state.fontSize * TOUCH_SCALE,
-    fill: isLight ? '#000000' : color,
-    fontFamily: 'monospace',
-    fontWeight: 'bold',
-    backgroundColor: isLight ? 'rgba(255,255,255,0.92)' : '',
-    shadow: isLight ? '' : '1px 1px 3px rgba(0,0,0,0.9)',
-    padding: isLight ? Math.round(3 * TOUCH_SCALE) : 0,
-    selectable: sel, evented: sel,
-    _measureId: measureId,
-    _userLabel: userSelectable,
-    originX: 'center', originY: 'center',
-  });
-  canvas.add(txt);
-  return txt;
-}
-
-function addEndpointDot(x, y, color, measureId) {
-  const dot = new fabric.Circle({
-    left: x, top: y, radius: 1 * TOUCH_SCALE,
-    fill: color, stroke: '#ffffff', strokeWidth: 0.3 * TOUCH_SCALE,
-    originX: 'center', originY: 'center',
-    selectable: false, evented: false,
-    _measureId: measureId !== -1 ? measureId : undefined,
-    _tempDraw: measureId === -1,
-    _noSelect: true,
-  });
-  canvas.add(dot);
-  return dot;
-}
-
-function addRefEndmarks(line, color, measureId) {
-  const dx = line.x2 - line.x1;
-  const dy = line.y2 - line.y1;
-  const len = Math.hypot(dx, dy);
-  if (len < 1) return;
-  const nx = -dy / len * 4 * TOUCH_SCALE;
-  const ny =  dx / len * 4 * TOUCH_SCALE;
-  [[line.x1, line.y1], [line.x2, line.y2]].forEach(([cx, cy]) => {
-    canvas.add(new fabric.Line([cx + nx, cy + ny, cx - nx, cy - ny], {
-      stroke: color, strokeWidth: 0.5 * TOUCH_SCALE,
-      selectable: false, evented: false,
-      _measureId: measureId, _noSelect: true,
-    }));
-  });
-}
-
-function addTickMarks(line, color, measureId) {
-  const dx = line.x2 - line.x1;
-  const dy = line.y2 - line.y1;
-  const len = Math.hypot(dx, dy);
-  if (len < 1) return;
-  const nx = -dy / len * 4 * TOUCH_SCALE;
-  const ny =  dx / len * 4 * TOUCH_SCALE;
-  [[line.x1, line.y1], [line.x2, line.y2]].forEach(([cx, cy]) => {
-    canvas.add(new fabric.Line([cx + nx, cy + ny, cx - nx, cy - ny], {
-      stroke: color, strokeWidth: 0.5 * TOUCH_SCALE,
-      selectable: false, evented: false,
-      _measureId: measureId, _noSelect: true,
-    }));
-  });
-}
-
-function ptDist(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
-
-// Distance from point p to line segment a–b
-function pointToSegmentDist(p, a, b) {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-9) return Math.hypot(p.x - a.x, p.y - a.y);
-  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
-}
-
-function polygonArea(pts) {
-  let a = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const j = (i + 1) % pts.length;
-    a += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
-  }
-  return Math.abs(a) / 2;
-}
-
-function formatDistance(m) {
-  return m.toFixed(2) + ' m';
-}
-
-function formatArea(m2) {
-  return m2.toFixed(2) + ' m²';
-}
-
-// Fehler in geeigneter Einheit formatieren (Eingabe: Meter)
-function formatErr(m) {
-  if (m >= 1)    return `±${m.toFixed(2)} m`;
-  if (m >= 0.01) return `±${(m * 100).toFixed(1)} cm`;
-  return `±${(m * 1000).toFixed(1)} mm`;
-}
 
 // Absoluter Gesamtfehler [m] für eine Distanzmessung (2 Endpunkte).
 // Setzt sich zusammen aus Digitalisierungsfehler + Maßstabsfehler.
@@ -4741,34 +4546,6 @@ function openMaterialCalc(id) {
     if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); okBtn.click(); }
     if (e.key === 'Escape') { e.preventDefault(); if (!done) { done = true; document.body.removeChild(overlay); } }
   };
-}
-
-// =========================================================
-// MODAL
-// =========================================================
-function createModal(title, bodyHTML, onConfirm, onCancel, okLabel = 'OK') {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal">
-      <h2>${title}</h2>
-      ${bodyHTML}
-      <div class="btn-row">
-        <button id="modal-cancel">Abbrechen</button>
-        <button id="modal-ok">${okLabel}</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  let done = false;
-  const close = () => { if (done) return; done = true; document.body.removeChild(overlay); };
-  overlay.querySelector('#modal-ok').onclick    = () => { if (!done) { onConfirm(); close(); } };
-  overlay.querySelector('#modal-cancel').onclick = () => { if (!done) { if (onCancel) onCancel(); close(); } };
-  overlay.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { e.preventDefault(); if (!done) { onConfirm(); close(); } }
-    if (e.key === 'Escape') { e.preventDefault(); if (!done) { if (onCancel) onCancel(); close(); } }
-  });
-  overlay.focus();
-  return overlay;
 }
 
 // =========================================================
