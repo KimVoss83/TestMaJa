@@ -1,5 +1,6 @@
 import { PIPE_TYPES, state, measureId, nextMeasureId, setMeasureId, CANVAS_SERIAL_PROPS, _isTouchDevice, TOUCH_SCALE } from './state.js';
 import { canvas, wrapper, _safeHandler, showZoomHUD, setZoom, zoomToFit, startPan, stopPan } from './canvas.js';
+import { history, registerRestoreHook, getSnapshot, saveSnapshot, restoreSnapshot, undo, redo, updateUndoRedoButtons } from './undo.js';
 
 // =========================================================
 // NOTIFICATION BADGES
@@ -356,109 +357,6 @@ function placeLibraryItem(item) {
 initCustomLib()
   .catch(() => {}) // IndexedDB-Fehler isolieren
   .then(() => renderLibrary(LIB_CATS[0]));
-
-// =========================================================
-// UNDO / REDO
-// =========================================================
-const history = { past: [], future: [], MAX: 40, _paused: false, _restoring: false };
-
-function getSnapshot() {
-  const json = canvas.toJSON(CANVAS_SERIAL_PROPS);
-  json.objects = (json.objects || []).filter(o => !o._isBackground && o._dimLinePipeId == null);
-  return {
-    canvas:        JSON.stringify(json),
-    measurements:  JSON.stringify(state.measurements),
-    pipeRefs:      JSON.stringify(state.pipeReferences),
-    activePipeRefs:JSON.stringify(state.activePipeRefs),
-    scale:         state.scale,
-    scaleSource:   state.scaleSource,
-    refLines:      JSON.stringify(state.refLines),
-    refSumL2:      state.refSumL2,
-    measureId:     measureId,
-  };
-}
-
-function saveSnapshot() {
-  if (history._paused) return;
-  history.past.push(getSnapshot());
-  if (history.past.length > history.MAX) history.past.shift();
-  history.future = [];
-  updateUndoRedoButtons();
-}
-
-function restoreSnapshot(snap) {
-  history._paused = true;
-  history._restoring = true;
-  const bg = state.backgroundImage;
-  try {
-    canvas.loadFromJSON(JSON.parse(snap.canvas), () => {
-      try {
-        if (bg) { canvas.add(bg); canvas.sendToBack(bg); }
-        state.backgroundImage  = bg;
-        state.measurements     = JSON.parse(snap.measurements);
-        state.pipeReferences   = JSON.parse(snap.pipeRefs);
-        state.activePipeRefs   = JSON.parse(snap.activePipeRefs);
-        state.scale            = snap.scale;
-        state.scaleSource      = snap.scaleSource;
-        state.refLines         = JSON.parse(snap.refLines);
-        state.refSumL2         = snap.refSumL2;
-        setMeasureId(snap.measureId);
-
-        // Integritätscheck: activePipeRefs auf existierende Referenzen beschränken
-        const validRefIds = new Set(state.pipeReferences.map(r => r.id));
-        state.activePipeRefs = state.activePipeRefs.filter(id => validRefIds.has(id));
-        // Integritätscheck: measurement.refs auf existierende Referenzen beschränken
-        state.measurements.forEach(m => {
-          if (Array.isArray(m.refs)) {
-            m.refs = m.refs.filter(id => validRefIds.has(id));
-          }
-        });
-
-        updateRefStatus();
-        updateMeasurementList();
-        updatePipeLegend();
-        updatePipeRefList();
-        updatePipePanel();
-        canvas.renderAll();
-        // Dim-Linien aus wiederhergestelltem State neu rendern
-        canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
-        renderAllDimLines();
-      } catch (e) {
-        console.error('Fehler beim Wiederherstellen des Snapshots:', e);
-        showToast('Undo/Redo fehlgeschlagen.', 'error');
-      } finally {
-        history._paused = false;
-        history._restoring = false;
-        updateUndoRedoButtons();
-      }
-    });
-  } catch (e) {
-    console.error('Fehler beim Laden des Canvas-JSON:', e);
-    showToast('Undo/Redo fehlgeschlagen.', 'error');
-    history._paused = false;
-    history._restoring = false;
-    updateUndoRedoButtons();
-  }
-}
-
-function undo() {
-  if (history._restoring || !history.past.length) return;
-  history.future.push(getSnapshot());
-  restoreSnapshot(history.past.pop());
-}
-
-function redo() {
-  if (history._restoring || !history.future.length) return;
-  history.past.push(getSnapshot());
-  restoreSnapshot(history.future.pop());
-}
-
-function updateUndoRedoButtons() {
-  const u = document.getElementById('btn-undo');
-  const r = document.getElementById('btn-redo');
-  if (u) u.disabled = history._restoring || history.past.length === 0;
-  if (r) r.disabled = history._restoring || history.future.length === 0;
-}
 
 // =========================================================
 // TOOL MANAGEMENT
@@ -5774,6 +5672,14 @@ window.addEventListener('resize', () => {
   if (gc) { gc.width = wrapper.clientWidth; gc.height = wrapper.clientHeight; }
   canvas.renderAll();
 });
+
+// Register restore hooks for undo/redo
+registerRestoreHook(() => updateRefStatus());
+registerRestoreHook(() => updateMeasurementList());
+registerRestoreHook(() => updatePipeLegend());
+registerRestoreHook(() => updatePipeRefList());
+registerRestoreHook(() => updatePipePanel());
+registerRestoreHook(() => renderAllDimLines());
 
 // =========================================================
 // INIT
