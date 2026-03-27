@@ -11,6 +11,12 @@ import { _prevCounts, _notifyBadge } from './ui/statusbar.js';
 import { showWelcomeOnboarding } from './onboarding/welcome.js';
 import { initRefOnboarding, showRefOnboarding } from './onboarding/ref-onboarding.js';
 import { initWhatsNew } from './ui/whats-new.js';
+import { TOOL_NAMES, TOOL_HINTS, MEASURE_TOOLS, setTool, requireScale, updateMeasureButtons, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
+import { handleDistanceClick, finishDistance } from './tools/distance.js';
+import { handleAreaClick, updatePreviewPolygon, finishArea } from './tools/area.js';
+import { handleCircleClick, updatePreviewCircle, finishCircle } from './tools/circle.js';
+import { handleArcClick, updatePreviewArc, arcSweepDir, buildSectorPath, finishArc } from './tools/arc.js';
+import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
 
 // =========================================================
 // LIBRARY — 2D-Skizzen Vogelperspektive
@@ -354,194 +360,13 @@ initCustomLib()
   .then(() => renderLibrary(LIB_CATS[0]));
 
 // =========================================================
-// TOOL MANAGEMENT
+// TOOL MANAGEMENT — extracted to ./tools/tool-manager.js
+// TOOL_NAMES, TOOL_HINTS, MEASURE_TOOLS, setTool, requireScale,
+// updateMeasureButtons, initToolManager, initToolbar imported above.
 // =========================================================
-const TOOL_NAMES = {
-  select: 'Auswahl', ref: 'Maßstab', distance: 'Distanz',
-  area: 'Fläche', circle: 'Kreis', arc: 'Kreisabschnitt', label: 'Label',
-  pipe: 'Leitung'
-};
-const TOOL_HINTS = {
-  select: '',
-  ref: 'Startpunkt klicken …',
-  distance: 'Startpunkt klicken …',
-  area: 'Punkte klicken → Doppelklick zum Abschluss',
-  circle: 'Mittelpunkt klicken …',
-  arc: 'Mittelpunkt klicken …',
-  label: 'Klicken = neues Label · Doppelklick = bearbeiten',
-  pipe: 'Punkte klicken → Doppelklick zum Abschluss',
-};
-const MEASURE_TOOLS = ['distance', 'area', 'circle', 'arc'];
-
-function requireScale() {
-  if (state.scale) return true;
-  showToast('Bitte zuerst ein Referenzmaß setzen!', 'warning');
-  setTool('ref');
-  // Maßstab-Akkordeon kurz aufleuchten
-  const scaleAcc = [...document.querySelectorAll('.acc-section')].find(s =>
-    s.querySelector('.acc-title')?.textContent.trim() === 'Maßstab'
-  );
-  if (scaleAcc) {
-    scaleAcc.classList.add('open');
-    scaleAcc.style.transition = 'box-shadow 0.15s';
-    scaleAcc.style.boxShadow = '0 0 0 2px #f59e0b';
-    setTimeout(() => { scaleAcc.style.boxShadow = ''; }, 1200);
-  }
-  return false;
-}
-
-
-function updateMeasureButtons() {
-  MEASURE_TOOLS.forEach(id => {
-    const btn = document.getElementById('btn-' + id);
-    if (!btn) return;
-    btn.classList.toggle('needs-ref', !state.scale);
-    btn.title = !state.scale
-      ? 'Zuerst Referenzmaß setzen!'
-      : { distance: 'Distanz messen (2 Klicks)', area: 'Polygon-Fläche (Doppelklick zum Abschluss)', circle: 'Kreis: Klick = Mittelpunkt, 2. Klick = Radius', arc: 'Kreisabschnitt: 3 Klicks' }[id];
-  });
-}
-
-// Mobile onboarding trigger (defined here so it's available when setTool runs)
-const _MOB_OB_TOOLS = ['ref','distance','area','circle','arc','pipe'];
-function _tryMobileOnboarding(t) {
-  if (!_MOB_OB_TOOLS.includes(t)) return;
-  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  if (!isMobile || localStorage.getItem('gp_mobile_ob_seen')) return;
-  const el = document.getElementById('mobile-onboarding');
-  if (el) el.classList.add('visible');
-}
-
-function setTool(t) {
-  if (MEASURE_TOOLS.includes(t) && !requireScale()) return;
-  _tryMobileOnboarding(t);
-  state.tool = t;
-  cancelDrawing();
-  Object.keys(TOOL_NAMES).forEach(id => {
-    const btn = document.getElementById('btn-' + id);
-    if (btn) btn.classList.toggle('active', id === t);
-  });
-  // Sync mobile bottom toolbar
-  if (typeof _isTouchDevice !== 'undefined' && _isTouchDevice) {
-    document.querySelectorAll('#touch-toolbar button[id^="tt-"]').forEach(btn => {
-      const tool = btn.id.replace('tt-', '');
-      btn.classList.toggle('active', tool === t);
-    });
-  }
-  canvas.isDrawingMode = false;
-  canvas.selection = (t === 'select');
-  canvas.defaultCursor = t === 'select' ? 'default' : 'crosshair';
-  if (t === 'select') _loupe.hide();
-  if (typeof _mobileMag !== 'undefined') _mobileMag.hide();
-  canvas.forEachObject(o => {
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
-    o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot;
-    o.lockMovementX = !isMovable;
-    o.lockMovementY = !isMovable;
-  });
-  document.getElementById('status-tool').textContent = 'Werkzeug: ' + TOOL_NAMES[t];
-  document.getElementById('status-hint').textContent = TOOL_HINTS[t];
-  document.getElementById('pipe-type-group').style.display = (t === 'pipe') ? '' : 'none';
-  // Mobile pipe bar
-  const mpb = document.getElementById('mobile-pipe-bar');
-  if (mpb) mpb.classList.toggle('visible', t === 'pipe');
-  // Mobile helpers bar — hide when switching to a non-helper-compatible tool
-  const mhb = document.getElementById('mobile-helpers-bar');
-  if (mhb) {
-    const HELPER_PARENT_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
-    if (!HELPER_PARENT_TOOLS.includes(t)) mhb.classList.remove('visible');
-  }
-  const REF_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
-  if (!REF_TOOLS.includes(t)) { state.pipeRefMode = null; state.pipeRefTempPt = null; }
-  // Sections stay collapsed — notification badges show new items
-}
-
-Object.keys(TOOL_NAMES).forEach(id => {
-  const btn = document.getElementById('btn-' + id);
-  if (btn) btn.onclick = () => setTool(id);
-});
-
-// Pipe type select
-(function initPipeSelect() {
-  const sel = document.getElementById('pipe-type-select');
-  const MAIN_PIPE_KEYS = ['TW','AW','RW','GB','G','St','GF','Cu','LR'];
-  MAIN_PIPE_KEYS.forEach(key => {
-    const pt = PIPE_TYPES[key];
-    const opt = document.createElement('option');
-    opt.value = key; opt.textContent = `● ${pt.label}`; opt.style.color = pt.color;
-    sel.appendChild(opt);
-  });
-  sel.value = state.pipeType;
-  sel.onchange = () => { state.pipeType = sel.value; };
-})();
-
-// Mobile pipe type bar
-(function initMobilePipeBar() {
-  const bar = document.getElementById('mobile-pipe-bar');
-  if (!bar) return;
-  const MAIN_PIPE_KEYS = ['TW','AW','RW','GB','G','St','GF','Cu','LR'];
-  MAIN_PIPE_KEYS.forEach(key => {
-    const pt = PIPE_TYPES[key];
-    const chip = document.createElement('button');
-    chip.className = 'mp-chip';
-    chip.dataset.key = key;
-    chip.innerHTML = `<span class="mp-dot" style="background:${pt.color}"></span>${pt.label}`;
-    if (key === state.pipeType) chip.classList.add('active');
-    chip.onclick = () => {
-      state.pipeType = key;
-      document.getElementById('pipe-type-select').value = key;
-      bar.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-    };
-    bar.appendChild(chip);
-  });
-})();
 
 // Init pipe ref list
 updatePipeRefList();
-
-// Line width picker
-document.querySelectorAll('.lw-dot').forEach(dot => {
-  dot.onclick = () => {
-    document.querySelectorAll('.lw-dot').forEach(d => d.classList.remove('active'));
-    dot.classList.add('active');
-    state.lineWidth = parseInt(dot.dataset.lw);
-  };
-});
-// Set default active (1px)
-document.querySelectorAll('.lw-dot').forEach(d => d.classList.toggle('active', d.dataset.lw === '1'));
-
-// =========================================================
-// COLOR PICKER
-// =========================================================
-document.querySelectorAll('.color-dot').forEach(dot => {
-  dot.onclick = () => {
-    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-    dot.classList.add('active');
-    state.color = dot.dataset.color;
-  };
-});
-
-// =========================================================
-// FONT SIZE
-// =========================================================
-document.getElementById('font-size-input').addEventListener('input', e => {
-  const v = parseInt(e.target.value);
-  if (v >= 6 && v <= 72) state.fontSize = v;
-});
-
-// =========================================================
-// LABEL BACKGROUND TOGGLE
-// =========================================================
-const btnLabelBg = document.getElementById('btn-label-bg');
-const _bgIcon = btnLabelBg.querySelector('.btn-icon').outerHTML;
-btnLabelBg.onclick = () => {
-  state.labelBg = !state.labelBg;
-  btnLabelBg.innerHTML = _bgIcon + (state.labelBg ? ' BG: Hell' : ' BG: Dunkel');
-  btnLabelBg.classList.toggle('active', state.labelBg);
-};
 
 // =========================================================
 // EXIF / PHOTOGRAMMETRIE
@@ -1124,7 +949,7 @@ canvas.on('mouse:down', _safeHandler(opt => {
     case 'area':     handleAreaClick(p); break;
     case 'circle':   handleCircleClick(p); break;
     case 'arc':      handleArcClick(p); break;
-    case 'label':    promptLabel(p); break;
+    case 'label':    handleLabelClick(p); break;
     case 'pipe':     handlePipeClick(p); break;
   }
 }));
@@ -1659,122 +1484,14 @@ function hideAccuracyDetail() {
 }
 
 // =========================================================
-// DISTANCE TOOL
+// DISTANCE TOOL — extracted to ./tools/distance.js
+// handleDistanceClick, finishDistance imported above.
 // =========================================================
-function handleDistanceClick(p) {
-  if (state.distPoints.length === 0) {
-    state.distPoints = [p];
-    document.getElementById('status-hint').textContent = 'Endpunkt klicken …';
-    // Start dot
-    addEndpointDot(p.x, p.y, state.color, -1); // temp dot id -1
-    state.drawingLine = new fabric.Line([p.x, p.y, p.x, p.y], {
-      stroke: state.color, strokeWidth: state.lineWidth,
-      selectable: false, evented: false, _noSelect: true, _tempDraw: true,
-    });
-    canvas.add(state.drawingLine);
-  } else {
-    finishDistance(p);
-    document.getElementById('status-hint').textContent = TOOL_HINTS['distance'];
-  }
-}
-
-function finishDistance(p2) {
-  removeLiveLabel();
-  const p1 = state.distPoints[0];
-  const pxDist = ptDist(p1.x, p1.y, p2.x, p2.y) / state.imgDisplayScale;
-  const meters = state.scale ? pxDist / state.scale : null;
-  const errM = distErr_m(meters);
-  const labelText = meters
-    ? formatDistance(meters)
-    : `${Math.round(pxDist)} px`;
-
-  // Remove temp objects
-  canvas.getObjects().filter(o => o._tempDraw).forEach(o => canvas.remove(o));
-  if (state.drawingLine) { canvas.remove(state.drawingLine); state.drawingLine = null; }
-
-  const id = nextMeasureId();
-  const line = new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
-    stroke: state.color, strokeWidth: state.lineWidth,
-    selectable: true, evented: true, _measureId: id,
-    lockMovementX: true, lockMovementY: true,
-  });
-
-  canvas.add(line);
-  addEndpointDot(p1.x, p1.y, state.color, id);
-  addEndpointDot(p2.x, p2.y, state.color, id);
-  addTickMarks(line, state.color, id);
-
-  const mx = (p1.x + p2.x) / 2;
-  const my = (p1.y + p2.y) / 2;
-  const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-  const offX = -Math.sin(angle) * 14;
-  const offY =  Math.cos(angle) * 14;
-  const txt = addLabel(mx + offX, my + offY, labelText, state.color, id);
-
-  canvas.renderAll();
-  state.measurements.push({ id, type: 'distance', label: labelText, value: meters });
-  updateMeasurementList();
-  state.distPoints = [];
-  saveSnapshot();
-  haptic('medium');
-  showMeasurementToast(labelText);
-}
 
 // =========================================================
-// AREA TOOL
+// AREA TOOL — extracted to ./tools/area.js
+// handleAreaClick, updatePreviewPolygon, finishArea imported above.
 // =========================================================
-function handleAreaClick(p) {
-  state.areaPoints.push(p);
-  document.getElementById('status-hint').textContent =
-    `${state.areaPoints.length} Punkt(e) gesetzt – Doppelklick zum Abschluss`;
-}
-
-function updatePreviewPolygon(pts) {
-  if (state.drawingPolygon) canvas.remove(state.drawingPolygon);
-  if (pts.length < 2) return;
-  state.drawingPolygon = new fabric.Polyline(pts.map(p => ({ x: p.x, y: p.y })), {
-    fill: state.color + '22', stroke: state.color, strokeWidth: state.lineWidth,
-    strokeDashArray: [5, 4],
-    selectable: false, evented: false, _noSelect: true,
-  });
-  canvas.add(state.drawingPolygon);
-  canvas.renderAll();
-}
-
-function finishArea() {
-  if (state.drawingPolygon) { canvas.remove(state.drawingPolygon); state.drawingPolygon = null; }
-  const pts = state.areaPoints.slice();
-  if (pts.length < 3) { state.areaPoints = []; return; }
-
-  const pxArea = polygonArea(pts) / (state.imgDisplayScale ** 2);
-  const m2 = state.scale ? pxArea / (state.scale ** 2) : null;
-  const areaErrPct = areaRelErr_pct(m2, pts.length);
-  const labelText = m2
-    ? formatArea(m2)
-    : `${Math.round(pxArea)} px²`;
-
-  const id = nextMeasureId();
-  const poly = new fabric.Polygon(pts.map(p => ({ x: p.x, y: p.y })), {
-    fill: state.color + '33', stroke: state.color, strokeWidth: state.lineWidth,
-    selectable: true, evented: true, _measureId: id,
-    lockMovementX: true, lockMovementY: true,
-  });
-
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-
-  canvas.add(poly);
-  addLabel(cx, cy, labelText, state.color, id);
-  canvas.renderAll();
-
-  state.measurements.push({ id, type: 'area', label: labelText, value: m2 });
-  updateMeasurementList();
-  state.areaPoints = [];
-  saveSnapshot();
-  document.getElementById('status-hint').textContent = TOOL_HINTS['area'];
-  haptic('medium');
-  showMeasurementToast(labelText);
-}
 
 // =========================================================
 // PIPE TOOL
@@ -3023,323 +2740,24 @@ function updatePipePanel() {
 }
 
 // =========================================================
-// CIRCLE TOOL
+// CIRCLE TOOL — extracted to ./tools/circle.js
+// handleCircleClick, updatePreviewCircle, finishCircle imported above.
 // =========================================================
-function handleCircleClick(p) {
-  if (!state.circleCenter) {
-    state.circleCenter = p;
-    document.getElementById('status-hint').textContent = 'Radius klicken …';
-  } else {
-    finishCircle(p);
-    document.getElementById('status-hint').textContent = TOOL_HINTS['circle'];
-  }
-}
-
-function updatePreviewCircle(center, r, edgePt) {
-  canvas.getObjects().filter(o => o._circlePreview).forEach(o => canvas.remove(o));
-  if (r < 2) return;
-
-  const circ = new fabric.Circle({
-    left: center.x - r, top: center.y - r, radius: r,
-    fill: state.color + '22', stroke: state.color, strokeWidth: state.lineWidth, strokeDashArray: [5, 4],
-    selectable: false, evented: false, _circlePreview: true, _noSelect: true,
-  });
-  const radiusLine = new fabric.Line([center.x, center.y, edgePt.x, edgePt.y], {
-    stroke: state.color, strokeWidth: 1, strokeDashArray: [4, 3],
-    selectable: false, evented: false, _circlePreview: true, _noSelect: true,
-  });
-  canvas.add(circ, radiusLine);
-  canvas.renderAll();
-}
-
-function finishCircle(edgePt) {
-  removeLiveLabel();
-  canvas.getObjects().filter(o => o._circlePreview).forEach(o => canvas.remove(o));
-  const center = state.circleCenter;
-  state.circleCenter = null;
-
-  const r = ptDist(center.x, center.y, edgePt.x, edgePt.y);
-  const rOrig = r / state.imgDisplayScale;
-  const rMeters = state.scale ? rOrig / state.scale : null;
-  const m2 = rMeters ? Math.PI * rMeters * rMeters : null;
-
-  const rErrM = distErr_m(rMeters);
-  const aErrPct = areaRelErr_pct(m2, 1);
-  const rLabel = rMeters
-    ? `r = ${formatDistance(rMeters)}`
-    : `r = ${Math.round(r)} px`;
-  const aLabel = m2
-    ? `A = ${formatArea(m2)}`
-    : `A = ${Math.round(Math.PI * r * r)} px²`;
-
-  const id = nextMeasureId();
-
-  const circ = new fabric.Circle({
-    left: center.x - r, top: center.y - r, radius: r,
-    fill: state.color + '26', stroke: state.color, strokeWidth: state.lineWidth,
-    selectable: true, evented: true, _measureId: id,
-    lockMovementX: true, lockMovementY: true,
-  });
-
-  // Radius line from center to right edge (horizontal)
-  const radiusLine = new fabric.Line([center.x, center.y, center.x + r, center.y], {
-    stroke: state.color, strokeWidth: 1.5, strokeDashArray: [5, 3],
-    selectable: false, evented: false, _measureId: id,
-  });
-
-  // Center dot + edge dot – gleiche Größe wie Distanzpunkte
-  const centerDot = addEndpointDot(center.x, center.y, state.color, id);
-  const edgeDot   = addEndpointDot(center.x + r, center.y, state.color, id);
-
-  canvas.add(circ, radiusLine);
-
-  // Radius label (middle of radius line)
-  addLabel(center.x + r / 2, center.y - 10, rLabel, state.color, id);
-  // Area label (center of circle)
-  addLabel(center.x, center.y + 10, aLabel, state.color, id);
-
-  canvas.renderAll();
-
-  const combinedLabel = `${rLabel} | ${aLabel}`;
-  state.measurements.push({ id, type: 'circle', label: combinedLabel, value: m2, rMeters });
-  updateMeasurementList();
-  saveSnapshot();
-  haptic('medium');
-  showMeasurementToast(rLabel);
-}
 
 // =========================================================
-// ARC / SECTOR TOOL
+// ARC / SECTOR TOOL — extracted to ./tools/arc.js
+// handleArcClick, updatePreviewArc, arcSweepDir, buildSectorPath, finishArc imported above.
 // =========================================================
-function handleArcClick(p) {
-  if (state.arcStep === 0) {
-    state.arcCenter = p;
-    state.arcStep = 1;
-    // Center dot preview
-    const dot = new fabric.Circle({
-      left: p.x, top: p.y, radius: 5, fill: state.color, stroke: '#fff', strokeWidth: 1,
-      originX: 'center', originY: 'center',
-      selectable: false, evented: false, _arcPreview: true, _noSelect: true,
-    });
-    canvas.add(dot);
-    canvas.renderAll();
-    document.getElementById('status-hint').textContent = 'Startwinkel-Punkt klicken …';
-  } else if (state.arcStep === 1) {
-    state.arcStartPt = p;
-    state.arcStep = 2;
-    document.getElementById('status-hint').textContent = 'Endwinkel-Punkt klicken (oder Doppelklick)';
-  } else if (state.arcStep === 2) {
-    finishArc(p);
-  }
-}
-
-function updatePreviewArc(cursor) {
-  canvas.getObjects().filter(o => o._arcPreview && !o._arcCenterDot).forEach(o => canvas.remove(o));
-  const c = state.arcCenter;
-  if (!c) return;
-
-  if (state.arcStep === 1) {
-    // Show line from center to cursor
-    const line = new fabric.Line([c.x, c.y, cursor.x, cursor.y], {
-      stroke: state.color, strokeWidth: 1, strokeDashArray: [4, 3],
-      selectable: false, evented: false, _arcPreview: true, _noSelect: true,
-    });
-    canvas.add(line);
-  } else if (state.arcStep === 2 && state.arcStartPt) {
-    const r = ptDist(c.x, c.y, state.arcStartPt.x, state.arcStartPt.y);
-    const startAngle = Math.atan2(state.arcStartPt.y - c.y, state.arcStartPt.x - c.x);
-    const endAngle = Math.atan2(cursor.y - c.y, cursor.x - c.x);
-    const sweep = arcSweepDir(c, state.arcStartPt, cursor);
-    const pathEl = buildSectorPath(c, r, startAngle, endAngle, state.color, undefined, sweep);
-    pathEl._arcPreview = true; pathEl._noSelect = true;
-
-    const line1 = new fabric.Line([c.x, c.y, state.arcStartPt.x, state.arcStartPt.y], {
-      stroke: state.color, strokeWidth: state.lineWidth,
-      selectable: false, evented: false, _arcPreview: true, _noSelect: true,
-    });
-    const line2 = new fabric.Line([c.x, c.y, cursor.x, cursor.y], {
-      stroke: state.color, strokeWidth: state.lineWidth, strokeDashArray: [4, 3],
-      selectable: false, evented: false, _arcPreview: true, _noSelect: true,
-    });
-    canvas.add(pathEl, line1, line2);
-  }
-  canvas.renderAll();
-}
-
-// Gibt 1 (CW) oder 0 (CCW) zurück, je nachdem auf welcher Seite der cursor liegt
-function arcSweepDir(center, startPt, cursorPt) {
-  const cross = (startPt.x - center.x) * (cursorPt.y - center.y)
-              - (startPt.y - center.y) * (cursorPt.x - center.x);
-  return cross >= 0 ? 1 : 0;
-}
-
-function buildSectorPath(center, r, startAngle, endAngle, color, sw, sweep = 1) {
-  const sx = center.x + r * Math.cos(startAngle);
-  const sy = center.y + r * Math.sin(startAngle);
-  const ex = center.x + r * Math.cos(endAngle);
-  const ey = center.y + r * Math.sin(endAngle);
-  let diff = sweep === 1
-    ? (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI)
-    : (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI);
-  if (diff === 0) diff = 2 * Math.PI;
-  const large = diff > Math.PI ? 1 : 0;
-  const d = `M ${center.x} ${center.y} L ${sx} ${sy} A ${r} ${r} 0 ${large} ${sweep} ${ex} ${ey} Z`;
-  return new fabric.Path(d, {
-    fill: color + '33', stroke: color, strokeWidth: sw ?? state.lineWidth,
-    selectable: true, evented: true,
-    lockMovementX: true, lockMovementY: true,
-  });
-}
-
-function finishArc(endPt) {
-  canvas.getObjects().filter(o => o._arcPreview).forEach(o => canvas.remove(o));
-
-  const c = state.arcCenter;
-  const sp = state.arcStartPt;
-  const r = ptDist(c.x, c.y, sp.x, sp.y);
-  const startAngle = Math.atan2(sp.y - c.y, sp.x - c.x);
-  const endAngle   = Math.atan2(endPt.y - c.y, endPt.x - c.x);
-  const sweep      = arcSweepDir(c, sp, endPt);
-
-  let diff = sweep === 1
-    ? (endAngle - startAngle + 2 * Math.PI) % (2 * Math.PI)
-    : (startAngle - endAngle + 2 * Math.PI) % (2 * Math.PI);
-  if (diff === 0) diff = 2 * Math.PI;
-
-  const rOrig       = r / state.imgDisplayScale;
-  const rMeters     = state.scale ? rOrig / state.scale : null;
-  const arcLen      = rOrig * diff;
-  const arcLenM     = state.scale ? arcLen / state.scale : null;
-  const sectorArea  = 0.5 * rOrig * rOrig * diff;
-  const sectorAreaM = state.scale ? sectorArea / (state.scale ** 2) : null;
-  const angleDeg    = (diff * 180 / Math.PI).toFixed(1);
-
-  const rErrM_arc      = distErr_m(rMeters);
-  const arcErrM        = distErr_m(arcLenM);
-  const aErrPct_arc    = areaRelErr_pct(sectorAreaM, 2);
-  const rLabel    = rMeters     ? `r=${formatDistance(rMeters)}`           : `r=${Math.round(r)}px`;
-  const arcLabel  = arcLenM     ? `Bogen: ${formatDistance(arcLenM)}`      : `Bogen: ${Math.round(arcLen)}px`;
-  const aLabel    = sectorAreaM ? `A=${formatArea(sectorAreaM)}`            : `A=${Math.round(sectorArea)}px²`;
-  const fullLabel = `${angleDeg}° | ${rLabel} | ${aLabel}`;
-
-  const id = nextMeasureId();
-
-  const sector = buildSectorPath(c, r, startAngle, endAngle, state.color, undefined, sweep);
-  sector._measureId = id;
-
-  // Lines (Schenkel)
-  const line1 = new fabric.Line([c.x, c.y, sp.x, sp.y], {
-    stroke: state.color, strokeWidth: state.lineWidth,
-    selectable: false, evented: false, _measureId: id,
-  });
-  const line2 = new fabric.Line([c.x, c.y, endPt.x, endPt.y], {
-    stroke: state.color, strokeWidth: state.lineWidth,
-    selectable: false, evented: false, _measureId: id,
-  });
-
-  canvas.add(sector, line1, line2);
-
-  // Endpoint dots – gleiche Größe wie Distanzpunkte
-  addEndpointDot(c.x,      c.y,      state.color, id);
-  addEndpointDot(sp.x,     sp.y,     state.color, id);
-  addEndpointDot(endPt.x,  endPt.y,  state.color, id);
-
-  // Labels
-  const midAngle = startAngle + diff / 2;
-  const labelR = r * 0.55;
-  const lx = c.x + labelR * Math.cos(midAngle);
-  const ly = c.y + labelR * Math.sin(midAngle);
-  addLabel(lx, ly, `${angleDeg}°`, state.color, id);
-  addLabel(lx, ly + state.fontSize + 4, aLabel, state.color, id);
-
-  // Arc bogen label on arc midpoint
-  const arcMidX = c.x + r * Math.cos(midAngle);
-  const arcMidY = c.y + r * Math.sin(midAngle);
-  addLabel(arcMidX, arcMidY - 10, arcLabel, state.color, id);
-
-  canvas.renderAll();
-  state.measurements.push({ id, type: 'arc', label: fullLabel, value: sectorAreaM });
-  updateMeasurementList();
-  saveSnapshot();
-
-  // Reset arc state
-  state.arcStep = 0;
-  state.arcCenter = null;
-  state.arcStartPt = null;
-  document.getElementById('status-hint').textContent = TOOL_HINTS['arc'];
-}
 
 // =========================================================
-// LABEL TOOL
+// LABEL TOOL — extracted to ./tools/label.js
+// handleLabelClick (was promptLabel), editLabel imported above.
 // =========================================================
-function promptLabel(p) {
-  createModal('Beschriftung',
-    `<input type="text" id="label-input" placeholder="Text eingeben …" />`,
-    () => {
-      const txt = document.getElementById('label-input').value.trim();
-      if (txt) addLabel(p.x, p.y, txt, state.color, null, true);
-    }
-  );
-  setTimeout(() => document.getElementById('label-input')?.focus(), 80);
-}
-
-function editLabel(labelObj) {
-  createModal('Beschriftung bearbeiten',
-    `<input type="text" id="label-input" value="${labelObj.text.replace(/"/g, '&quot;')}" />`,
-    () => {
-      const newText = document.getElementById('label-input').value.trim();
-      if (newText) {
-        labelObj.set({ text: newText });
-        canvas.renderAll();
-      } else {
-        // Leerer Text → Label entfernen
-        canvas.remove(labelObj);
-        canvas.renderAll();
-      }
-    }
-  );
-  setTimeout(() => {
-    const inp = document.getElementById('label-input');
-    if (inp) { inp.focus(); inp.select(); }
-  }, 80);
-}
 
 // =========================================================
-// LIVE LABEL (schwebendes Maß während des Zeichnens)
+// LIVE LABEL — extracted to ./tools/label.js
+// updateLiveLabel, removeLiveLabel imported above.
 // =========================================================
-let _liveLabel = null;
-
-function updateLiveLabel(p1, p2, text) {
-  const mx = (p1.x + p2.x) / 2;
-  const my = (p1.y + p2.y) / 2;
-  const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-  const offX = -Math.sin(angle) * 16;
-  const offY =  Math.cos(angle) * 16;
-  if (_liveLabel) {
-    _liveLabel.set({ left: mx + offX, top: my + offY, text: text });
-  } else {
-    _liveLabel = new fabric.Text(text, {
-      left: mx + offX, top: my + offY,
-      fontSize: state.fontSize,
-      fill: '#000000',
-      fontFamily: 'monospace',
-      fontWeight: 'bold',
-      backgroundColor: 'rgba(255,255,255,0.88)',
-      padding: 3,
-      originX: 'center', originY: 'center',
-      selectable: false, evented: false,
-      _noSelect: true, _liveLabel: true,
-    });
-    canvas.add(_liveLabel);
-  }
-}
-
-function removeLiveLabel() {
-  if (_liveLabel) {
-    canvas.remove(_liveLabel);
-    _liveLabel = null;
-  }
-}
 
 
 // Absoluter Gesamtfehler [m] für eine Distanzmessung (2 Endpunkte).
@@ -3392,6 +2810,16 @@ function cancelDrawing() {
 }
 
 // =========================================================
+// WIRE UP TOOL MANAGER
+// =========================================================
+// Inject cancelDrawing and loupe callbacks into tool-manager
+initToolManager({
+  cancelDrawing,
+  loupeHide: () => _loupe.hide(),
+  mobileMagHide: () => { if (typeof _mobileMag !== 'undefined') _mobileMag.hide(); },
+});
+
+// =========================================================
 // MEASUREMENT LIST
 // =========================================================
 const TYPE_ICONS = {
@@ -3440,6 +2868,19 @@ function removeMeasurement(id) {
 }
 
 // MATERIALS and openMaterialCalc are imported from ./ui/materialrechner.js
+
+// =========================================================
+// REGISTER HOOKS FOR TOOL MODULES
+// =========================================================
+// These allow tool modules (distance, area, circle, arc) to call back into main.js
+// for functions that are still defined here.
+registerToolHook('removeLiveLabel', removeLiveLabel);
+registerToolHook('updateMeasurementList', updateMeasurementList);
+registerToolHook('distErr_m', distErr_m);
+registerToolHook('areaRelErr_pct', areaRelErr_pct);
+
+// Init toolbar buttons, pickers, and line-width controls (extracted to tool-manager.js)
+initToolbar();
 
 // SAVE / LOAD  (Zentrales Modal)
 // =========================================================
