@@ -12,7 +12,7 @@ import { initRefOnboarding } from './onboarding/ref-onboarding.js';
 import { initWhatsNew } from './ui/whats-new.js';
 import { TOOL_HINTS, setTool, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
 import { handleDistanceClick, finishDistance } from './tools/distance.js';
-import { handleAreaClick, updatePreviewPolygon, finishArea, startAreaEdit, endAreaEdit, updateAreaFromHandles, getAreaSnap90, setAreaSnap90 } from './tools/area.js';
+import { handleAreaClick, updatePreviewPolygon, finishArea, startAreaEdit, endAreaEdit, updateAreaFromHandles, getAreaSnap90, setAreaSnap90, setShiftHeld } from './tools/area.js';
 import { handleCircleClick, updatePreviewCircle, finishCircle } from './tools/circle.js';
 import { handleArcClick, updatePreviewArc, finishArc } from './tools/arc.js';
 import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
@@ -383,6 +383,14 @@ document.addEventListener('keyup', e => {
     wrapper.classList.remove('space-pan', 'panning');
     canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
   }
+});
+
+// Shift → temporärer 90°-Snap für Flächentool
+document.addEventListener('keydown', e => {
+  if (e.key === 'Shift' && !e.repeat) setShiftHeld(true);
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'Shift') setShiftHeld(false);
 });
 
 // Wheel: Pinch/Cmd+Scroll → Zoom  |  Rest → Pan

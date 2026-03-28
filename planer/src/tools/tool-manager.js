@@ -14,7 +14,7 @@ export const TOOL_HINTS = {
   select: '',
   ref: 'Startpunkt klicken …',
   distance: 'Startpunkt klicken …',
-  area: 'Punkte klicken → Doppelklick zum Abschluss',
+  area: 'Punkte klicken → Doppelklick zum Abschluss · Shift halten = 90°',
   circle: 'Mittelpunkt klicken …',
   arc: 'Mittelpunkt klicken …',
   label: 'Klicken = neues Label · Doppelklick = bearbeiten',

@@ -14,9 +14,16 @@ let _areaSnap90 = false;
 export function setAreaSnap90(v) { _areaSnap90 = v; }
 export function getAreaSnap90() { return _areaSnap90; }
 
+// Check if 90° snap is active (toggle OR shift key)
+export function isSnap90Active() { return _areaSnap90 || _shiftHeld; }
+
+// Track shift key state
+let _shiftHeld = false;
+export function setShiftHeld(v) { _shiftHeld = v; }
+
 // Snap point to 90° relative to the previous edge direction
 export function snap90(p, pts) {
-  if (!_areaSnap90 || pts.length < 1) return p;
+  if (!isSnap90Active() || pts.length < 1) return p;
   const prev = pts[pts.length - 1];
   const dx = p.x - prev.x;
   const dy = p.y - prev.y;
