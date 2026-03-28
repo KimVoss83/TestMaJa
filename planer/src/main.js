@@ -29,6 +29,8 @@ import { LIBRARY, LIB_CATS, EIGENE_CAT, renderLibrary, placeLibraryItem, placeCu
 import { loadFileAuto, loadImageFromDataUrl, readAndApplyExif } from './io/image-loader.js';
 import { openSaveModal, openLoadModal, doSavePNG, doSavePDF, doSaveProjectJSON } from './io/save-load.js';
 import { exportLeitungen, handleLeitungenAlignClick } from './io/pipe-transfer.js';
+import { initMobileDrawer, initBottomToolbar, initOrientationChange } from './mobile/drawer.js';
+import { initTouchHandlers, initTouchPinchPan, _mobileMag } from './mobile/touch.js';
 
 
 // =========================================================
@@ -57,6 +59,16 @@ updatePipeRefList();
 // _loupe and throttledRender are imported from ./utils/loupe.js
 
 // =========================================================
+// TOUCH STATE (shared refs — declared here so canvas event handlers below can access them)
+// =========================================================
+// These are passed into initTouchHandlers / initTouchPinchPan further below.
+const _touchSuppressClickRef = { value: false, _pinchCooldownUntil: 0 };
+const _mobileAdjust = {
+  active: false,       // currently adjusting a point
+  lastCanvasPos: null, // last known canvas-coordinate position
+};
+
+// =========================================================
 // CANVAS EVENTS
 // =========================================================
 
@@ -66,7 +78,7 @@ canvas.on('mouse:move', _safeHandler(opt => {
 
   // Auf Touch-Geräten: Preview-Updates nur wenn NICHT im Adjust-Modus
   // (dort übernimmt der Capture-Touchmove-Handler die Updates, um Doppel-Rendering zu vermeiden)
-  const _skipPreview = typeof _mobileAdjust !== 'undefined' && _mobileAdjust.active;
+  const _skipPreview = _mobileAdjust.active;
   if (!_skipPreview) {
   // Ref line preview
   if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
@@ -136,7 +148,7 @@ canvas.on('mouse:out', () => { _loupe.hide(); });
 
 
 canvas.on('mouse:down', _safeHandler(opt => {
-  if (_touchSuppressClick) { _touchSuppressClick = false; return; }
+  if (_touchSuppressClickRef.value) { _touchSuppressClickRef.value = false; return; }
   if (opt.e.altKey || state.spacePan) { startPan(opt.e); return; }
   const pRaw = canvas.getPointer(opt.e);
   const p = (state.tool !== 'select' && state.tool !== 'label') ? snapToPixel(pRaw) : pRaw;
@@ -735,47 +747,12 @@ document.addEventListener('click', e => {
 initWhatsNew();
 
 // =========================================================
-// MOBILE: DRAWER TOGGLE
+// MOBILE: DRAWER TOGGLE — extracted to ./mobile/drawer.js
 // =========================================================
-const _sidebar = document.getElementById('sidebar');
-const _drawerToggle = document.getElementById('mobile-drawer-toggle');
-const _drawerBackdrop = document.getElementById('drawer-backdrop');
-
-function openDrawer() {
-  _sidebar.classList.add('drawer-open');
-  _drawerBackdrop.style.display = 'block';
-  requestAnimationFrame(() => _drawerBackdrop.classList.add('visible'));
-  _drawerToggle.textContent = 'Schließen ▼';
-  const tt = document.getElementById('touch-toolbar');
-  if (tt) tt.style.display = 'none';
-}
-function closeDrawer() {
-  _sidebar.classList.remove('drawer-open');
-  _drawerBackdrop.classList.remove('visible');
-  setTimeout(() => { _drawerBackdrop.style.display = 'none'; }, 260);
-  _drawerToggle.textContent = 'Messungen & Bibliothek ▲';
-  const tt = document.getElementById('touch-toolbar');
-  if (tt && _isTouchDevice) tt.style.display = 'flex';
-}
-_drawerToggle.onclick = () => {
-  _sidebar.classList.contains('drawer-open') ? closeDrawer() : openDrawer();
-};
-_drawerBackdrop.onclick = closeDrawer;
-
-// Swipe-down auf Drawer schließt ihn
-let _drawerTouchY = null;
-_sidebar.addEventListener('touchstart', e => {
-  _drawerTouchY = e.touches[0].clientY;
-}, { passive: true });
-_sidebar.addEventListener('touchmove', e => {
-  if (_drawerTouchY == null) return;
-  const dy = e.touches[0].clientY - _drawerTouchY;
-  if (dy > 50 && _sidebar.scrollTop <= 0) closeDrawer();
-}, { passive: true });
-_sidebar.addEventListener('touchend', () => { _drawerTouchY = null; }, { passive: true });
+const { openDrawer } = initMobileDrawer();
 
 // =========================================================
-// MOBILE: TOUCH EVENTS FÜR CANVAS
+// MOBILE: TOUCH EVENTS FÜR CANVAS — extracted to ./mobile/touch.js
 // =========================================================
 
 // ── Mobile Onboarding dismiss ──
@@ -794,554 +771,15 @@ if (_isTouchDevice) {
 }
 
 // =========================================================
-// MOBILE: BOTTOM TOUCH TOOLBAR
+// MOBILE: BOTTOM TOUCH TOOLBAR — extracted to ./mobile/drawer.js
 // =========================================================
-if (_isTouchDevice) {
-  const _ttToolMap = {
-    'tt-select': 'select', 'tt-ref': 'ref', 'tt-distance': 'distance',
-    'tt-area': 'area', 'tt-circle': 'circle', 'tt-pipe': 'pipe',
-  };
-  Object.entries(_ttToolMap).forEach(([btnId, tool]) => {
-    const btn = document.getElementById(btnId);
-    if (btn) btn.onclick = () => setTool(tool);
-  });
-  document.getElementById('tt-undo').onclick = () => undo();
+initBottomToolbar({ openDrawer });
 
-  // ── Mobile Helpers Bar (Hilfselemente) ──
-  let _activeHelper = 'pipe-ref-line'; // default
-  const _helpersBar = document.getElementById('mobile-helpers-bar');
-  const HELPER_ITEMS = [
-    { id: 'pipe-ref-line', label: 'Hilfslinie', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" stroke-dasharray="4 2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>' },
-    { id: 'pipe-ref-point', label: 'Hilfspunkt', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>' },
-  ];
-  if (_helpersBar) {
-    HELPER_ITEMS.forEach(h => {
-      const chip = document.createElement('button');
-      chip.className = 'mp-chip';
-      chip.dataset.helper = h.id;
-      chip.innerHTML = h.icon + ' ' + h.label;
-      if (h.id === _activeHelper) chip.classList.add('active');
-      chip.onclick = () => {
-        _activeHelper = h.id;
-        _helpersBar.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        document.getElementById('btn-' + h.id).click();
-      };
-      _helpersBar.appendChild(chip);
-    });
-  }
-  document.getElementById('tt-helpers').onclick = () => {
-    const bar = document.getElementById('mobile-helpers-bar');
-    if (bar.classList.contains('visible')) {
-      // Already open — activate the current helper
-      document.getElementById('btn-' + _activeHelper).click();
-    } else {
-      bar.classList.add('visible');
-      document.getElementById('btn-' + _activeHelper).click();
-    }
-  };
-
-  // ── Mobile Drei-Punkte-Menü ──
-  const _mmMenu = document.getElementById('mobile-menu');
-  const _mmBackdrop = document.getElementById('mobile-menu-backdrop');
-
-  function _openMobileMenu() {
-    _mmBackdrop.classList.add('visible');
-    // Force reflow so transition plays
-    _mmMenu.style.display = 'block';
-    requestAnimationFrame(() => requestAnimationFrame(() => _mmMenu.classList.add('visible')));
-  }
-  function _closeMobileMenu() {
-    _mmMenu.classList.remove('visible');
-    _mmBackdrop.classList.remove('visible');
-    setTimeout(() => { if (!_mmMenu.classList.contains('visible')) _mmMenu.style.display = 'none'; }, 260);
-  }
-
-  document.getElementById('tt-more').onclick = _openMobileMenu;
-  _mmBackdrop.onclick = _closeMobileMenu;
-
-  // Datei-Aktionen: leiten an die existierenden Header-Buttons weiter
-  document.getElementById('mm-upload').onclick = () => { _closeMobileMenu(); document.getElementById('file-input').click(); };
-  document.getElementById('mm-save').onclick = () => { _closeMobileMenu(); document.getElementById('btn-central-save').click(); };
-  document.getElementById('mm-load').onclick = () => { _closeMobileMenu(); document.getElementById('btn-central-load').click(); };
-  document.getElementById('mm-undo').onclick = () => { undo(); };
-  document.getElementById('mm-redo').onclick = () => { document.getElementById('btn-redo').click(); };
-  document.getElementById('mm-clear').onclick = () => { _closeMobileMenu(); document.getElementById('btn-clear-all').click(); };
-  document.getElementById('mm-help').onclick = () => { _closeMobileMenu(); document.getElementById('btn-help').click(); };
-  document.getElementById('mm-drawer').onclick = () => { _closeMobileMenu(); setTimeout(openDrawer, 280); };
-
-  // Farb-Punkte ins Menü spiegeln
-  const _mmColors = document.getElementById('mm-colors');
-  document.querySelectorAll('#color-picker .color-dot').forEach(dot => {
-    const c = dot.dataset.color;
-    const el = document.createElement('div');
-    el.className = 'mm-color-dot' + (dot.classList.contains('active') ? ' active' : '');
-    el.style.background = c;
-    if (c === '#ffffff') el.style.border = '2px solid #666';
-    el.onclick = () => {
-      dot.click(); // trigger original color picker
-      _mmColors.querySelectorAll('.mm-color-dot').forEach(d => d.classList.remove('active'));
-      el.classList.add('active');
-    };
-    _mmColors.appendChild(el);
-  });
-
-  // Linienstärke ins Menü spiegeln
-  const _mmLW = document.getElementById('mm-linewidths');
-  document.querySelectorAll('#line-width-picker .lw-dot').forEach(dot => {
-    const lw = dot.dataset.lw;
-    const el = document.createElement('div');
-    el.className = 'mm-lw-dot' + (dot.classList.contains('active') ? ' active' : '');
-    el.innerHTML = `<svg width="22" height="22"><line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" stroke-width="${lw}"/></svg>`;
-    el.onclick = () => {
-      dot.click(); // trigger original lw picker
-      _mmLW.querySelectorAll('.mm-lw-dot').forEach(d => d.classList.remove('active'));
-      el.classList.add('active');
-    };
-    _mmLW.appendChild(el);
-  });
-}
-
-// Prüfe ob Touch auf dem Drop-Overlay oder dessen Buttons stattfindet
-function _touchOnOverlay(e) {
-  const overlay = document.getElementById('drop-overlay');
-  return overlay && !overlay.classList.contains('hidden') && overlay.contains(e.target);
-}
-
-// Verhindere iOS-Bounce/Zoom auf dem Canvas-Bereich
-wrapper.addEventListener('touchmove', e => {
-  if (_touchOnOverlay(e)) return; // Overlay-Buttons nicht blockieren
-  if (e.touches.length >= 2 || state.tool !== 'select') {
-    e.preventDefault();
-  }
-}, { passive: false });
+// Wire up touch handlers (capture-phase point adjustment + pinch/pan)
+initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust });
+initTouchPinchPan({ _touchSuppressClickRef, _mobileAdjust });
 
 // =========================================================
-// TOUCH: STATE-MACHINE MIT PUNKT-JUSTIERUNG
-// Auf Mobilgeräten: Punkt wird beim Aufsetzen des Fingers
-// vorläufig platziert, kann verschoben werden, und wird
-// erst beim Anheben bestätigt.
+// MOBILE: CANVAS-GRÖßE BEI ORIENTATION-CHANGE — extracted to ./mobile/drawer.js
 // =========================================================
-let _touchState = { type: null, lastDist: 0, lastMid: null, startTime: 0 };
-const _PINCH_COOLDOWN_MS = 350;
-let _pinchCooldownUntil = 0;
-let _lastTapTime = 0;
-const _DOUBLE_TAP_MS = 400;
-let _touchSuppressClick = false;
-
-// Mobile Adjust State: Track touch-adjust mode for drawing tools
-let _mobileAdjust = {
-  active: false,       // currently adjusting a point
-  lastCanvasPos: null, // last known canvas-coordinate position
-};
-const _crosshairEl = document.getElementById('mobile-crosshair');
-const _finishBtn = document.getElementById('mobile-finish-btn');
-
-// Lupe auf Touch-Geräten deaktivieren (Desktop-Lupe nicht nötig)
-if (_isTouchDevice) {
-  _loupe.disable();
-}
-
-// =========================================================
-// MOBILE MAGNIFIER: Zwei Lupen-Kreise (Anfang links, Ende rechts)
-// =========================================================
-const _mobileMag = (() => {
-  if (!_isTouchDevice) return { show() {}, hide() {}, updateStart() {}, updateEnd() {}, hideStart() {}, hideEnd() {}, active: false };
-
-  const SIZE = 130, ZOOM = 4;
-  const dpr = () => window.devicePixelRatio || 1;
-
-  function createMagCanvas(container) {
-    const c = document.createElement('canvas');
-    container.insertBefore(c, container.firstChild);
-    const d = dpr();
-    c.width = SIZE * d;
-    c.height = SIZE * d;
-    c.style.width = SIZE + 'px';
-    c.style.height = SIZE + 'px';
-    return { canvas: c, ctx: c.getContext('2d') };
-  }
-
-  const startEl = document.getElementById('mobile-mag-start');
-  const endEl = document.getElementById('mobile-mag-end');
-  const startMag = createMagCanvas(startEl);
-  const endMag = createMagCanvas(endEl);
-
-  function renderMag(mag, canvasX, canvasY, color) {
-    const d = dpr();
-    const ctx = mag.ctx;
-    const c = mag.canvas;
-
-    if (c.width !== SIZE * d) {
-      c.width = SIZE * d; c.height = SIZE * d;
-      c.style.width = SIZE + 'px'; c.style.height = SIZE + 'px';
-    }
-
-    const vpt = canvas.viewportTransform;
-    const screenX = canvasX * vpt[0] + vpt[4];
-    const screenY = canvasY * vpt[3] + vpt[5];
-    const cpx = screenX * d, cpy = screenY * d;
-
-    const srcW = (SIZE / ZOOM) * d, srcH = (SIZE / ZOOM) * d;
-    const srcX = cpx - srcW / 2, srcY = cpy - srcH / 2;
-
-    ctx.clearRect(0, 0, SIZE * d, SIZE * d);
-    try { ctx.drawImage(canvas.lowerCanvasEl, srcX, srcY, srcW, srcH, 0, 0, SIZE * d, SIZE * d); } catch(_) {}
-
-    ctx.save();
-    ctx.scale(d, d);
-    const h = SIZE / 2, GAP = 6;
-
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.beginPath(); ctx.arc(h, h, GAP + 1, 0, Math.PI * 2); ctx.fill();
-
-    ctx.strokeStyle = color || 'rgba(210,30,30,0.92)';
-    ctx.lineWidth = 1.2;
-    ctx.setLineDash([5, 3]);
-    ctx.beginPath(); ctx.moveTo(0, h); ctx.lineTo(h - GAP, h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(h + GAP, h); ctx.lineTo(SIZE, h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(h, 0); ctx.lineTo(h, h - GAP); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(h, h + GAP); ctx.lineTo(h, SIZE); ctx.stroke();
-
-    ctx.setLineDash([]);
-    ctx.strokeStyle = color || 'rgba(210,30,30,1)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(h, h, 2.5, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-
-  let _active = false;
-  return {
-    get active() { return _active; },
-    updateStart(canvasX, canvasY, color) { startEl.classList.add('visible'); _active = true; renderMag(startMag, canvasX, canvasY, color); },
-    updateEnd(canvasX, canvasY, color) { endEl.classList.add('visible'); _active = true; renderMag(endMag, canvasX, canvasY, color); },
-    hideStart() { startEl.classList.remove('visible'); },
-    hideEnd() { endEl.classList.remove('visible'); },
-    show() { _active = true; },
-    hide() { _active = false; startEl.classList.remove('visible'); endEl.classList.remove('visible'); },
-  };
-})();
-
-// =========================================================
-// MOBILE CROSSHAIR: Positionierung + Sichtbarkeit
-// =========================================================
-function _showMobileCrosshair(clientX, clientY) {
-  _crosshairEl.style.left = clientX + 'px';
-  _crosshairEl.style.top = clientY + 'px';
-  _crosshairEl.classList.add('visible');
-}
-function _hideMobileCrosshair() {
-  _crosshairEl.classList.remove('visible');
-}
-
-// =========================================================
-// MOBILE FINISH BUTTON: für Fläche/Leitung (Multi-Punkt)
-// =========================================================
-function _updateFinishBtn() {
-  if (!_isTouchDevice) return;
-  const showFinish =
-    (state.tool === 'area' && state.areaPoints.length >= 3) ||
-    (state.tool === 'pipe' && state.pipePoints.length >= 2);
-  if (showFinish) {
-    _finishBtn.classList.add('visible');
-  } else {
-    _finishBtn.classList.remove('visible');
-  }
-}
-if (_isTouchDevice) {
-  _finishBtn.addEventListener('click', () => {
-    if (state.tool === 'area' && state.areaPoints.length >= 3) {
-      finishArea();
-    } else if (state.tool === 'pipe' && state.pipePoints.length >= 2) {
-      finishPipe();
-    }
-    _finishBtn.classList.remove('visible');
-    _mobileMag.hide();
-    _hideMobileCrosshair();
-  });
-}
-
-// =========================================================
-// MOBILE: Punkt-Justierung via Capture-Phase
-// Fängt touchstart VOR Fabric.js ab, damit mouse:down
-// unterdrückt wird. Der Punkt wird erst bei touchend gesetzt.
-// =========================================================
-function _getCanvasPtrFromTouch(touch) {
-  // Fabric.js getPointer verwenden für korrekte DPR/Retina-Berechnung
-  return canvas.getPointer({
-    clientX: touch.clientX,
-    clientY: touch.clientY,
-    pageX: touch.pageX,
-    pageY: touch.pageY,
-  });
-}
-
-function _updateMobileMagnifiers(p) {
-  const col = state.color || 'rgba(210,30,30,0.92)';
-  let hasStart = false;
-  if (state.tool === 'ref' && state.refPoints.length === 1) {
-    _mobileMag.updateStart(state.refPoints[0].x, state.refPoints[0].y, '#cc0000');
-    hasStart = true;
-  } else if (state.tool === 'distance' && state.distPoints.length === 1) {
-    _mobileMag.updateStart(state.distPoints[0].x, state.distPoints[0].y, col);
-    hasStart = true;
-  } else if (state.tool === 'circle' && state.circleCenter) {
-    _mobileMag.updateStart(state.circleCenter.x, state.circleCenter.y, col);
-    hasStart = true;
-  } else if (state.tool === 'arc' && state.arcStep >= 1 && state.arcCenter) {
-    _mobileMag.updateStart(state.arcCenter.x, state.arcCenter.y, col);
-    hasStart = true;
-  } else if (state.tool === 'area' && state.areaPoints.length >= 1) {
-    const lastPt = state.areaPoints[state.areaPoints.length - 1];
-    _mobileMag.updateStart(lastPt.x, lastPt.y, col);
-    hasStart = true;
-  } else if (state.tool === 'pipe' && state.pipePoints.length >= 1) {
-    const lastPt = state.pipePoints[state.pipePoints.length - 1];
-    _mobileMag.updateStart(lastPt.x, lastPt.y, col);
-    hasStart = true;
-  }
-  if (hasStart) {
-    // Zweiter Punkt: A zeigt Startpunkt (oben gesetzt), B zeigt Fingerposition
-    _mobileMag.updateEnd(p.x, p.y, col);
-  } else {
-    // Erster Punkt: A zeigt Fingerposition, B ausblenden
-    _mobileMag.updateStart(p.x, p.y, col);
-    _mobileMag.hideEnd();
-  }
-}
-
-if (_isTouchDevice) {
-  const DRAWING_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
-
-  // Capture-Phase: fängt Touch VOR Fabric.js ab
-  canvas.upperCanvasEl.addEventListener('touchstart', e => {
-    if (!DRAWING_TOOLS.includes(state.tool)) return;
-    if (!state.backgroundImage) return;
-    if (e.touches.length !== 1) return;
-    if (Date.now() < _pinchCooldownUntil) return;
-
-    // iOS-Standardverhalten verhindern (verhindert auch Fabric.js mouse:down via Maus-Emulation)
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    // Fabric.js mouse:down unterdrücken (falls es trotzdem feuert)
-    _touchSuppressClick = true;
-    _mobileAdjust.active = true;
-
-    const touch = e.touches[0];
-    const p = _getCanvasPtrFromTouch(touch);
-    _mobileAdjust.lastCanvasPos = p;
-
-    // Crosshair + Magnifier sofort zeigen
-    _showMobileCrosshair(touch.clientX, touch.clientY);
-    _updateMobileMagnifiers(p);
-  }, { capture: true, passive: false });
-
-  // Touchmove: Crosshair + Magnifier updaten, Preview-Linie updaten
-  canvas.upperCanvasEl.addEventListener('touchmove', e => {
-    if (!_mobileAdjust.active || e.touches.length !== 1) return;
-
-    // Fabric.js darf diesen Move nicht verarbeiten (sonst Doppel-Rendering)
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    const touch = e.touches[0];
-    const p = _getCanvasPtrFromTouch(touch);
-    _mobileAdjust.lastCanvasPos = p;
-
-    // Crosshair-Overlay verschieben
-    _showMobileCrosshair(touch.clientX, touch.clientY);
-
-    // Preview-Linie manuell updaten
-    const snapped = snapToPixel(p);
-    if (state.tool === 'ref' && state.refPoints.length === 1 && state.drawingLine) {
-      state.drawingLine.set({ x2: snapped.x, y2: snapped.y });
-      throttledRender();
-    }
-    if (state.tool === 'distance' && state.distPoints.length === 1 && state.drawingLine) {
-      state.drawingLine.set({ x2: snapped.x, y2: snapped.y });
-      const p1 = state.distPoints[0];
-      const pxDist = ptDist(p1.x, p1.y, snapped.x, snapped.y) / state.imgDisplayScale;
-      const meters = state.scale ? pxDist / state.scale : null;
-      const liveText = meters ? formatDistance(meters) : `${Math.round(pxDist)} px`;
-      updateLiveLabel(p1, snapped, liveText);
-      throttledRender();
-    }
-    if (state.tool === 'area' && state.areaPoints.length > 0) {
-      updatePreviewPolygon([...state.areaPoints, snapped]);
-    }
-    if (state.tool === 'circle' && state.circleCenter) {
-      const r = Math.hypot(snapped.x - state.circleCenter.x, snapped.y - state.circleCenter.y);
-      updatePreviewCircle(state.circleCenter, r, snapped);
-      const rOrig = r / state.imgDisplayScale;
-      const rMeters = state.scale ? rOrig / state.scale : null;
-      const liveText = rMeters ? `r = ${formatDistance(rMeters)}` : `r = ${Math.round(r)} px`;
-      updateLiveLabel(state.circleCenter, snapped, liveText);
-    }
-    if (state.tool === 'arc' && state.arcStep >= 1) {
-      updatePreviewArc(snapped);
-    }
-    if (state.tool === 'pipe' && state.pipePoints.length > 0) {
-      updatePreviewPipe([...state.pipePoints, snapped]);
-    }
-    if (DRAWING_TOOLS.includes(state.tool) && !state.pipeRefMode) {
-      showPipeDistanceGuides(snapped);
-    }
-
-    // Magnifier updaten
-    _updateMobileMagnifiers(snapped);
-  }, { capture: true, passive: false });
-
-  // Touchend: Punkt bestätigen
-  canvas.upperCanvasEl.addEventListener('touchend', e => {
-    if (!_mobileAdjust.active) return;
-
-    // Fabric.js touchend unterdrücken
-    e.stopImmediatePropagation();
-
-    _mobileAdjust.active = false;
-    _touchSuppressClick = false; // Reset für nächsten Touch
-    _hideMobileCrosshair();
-    haptic('light'); // Haptisches Feedback bei Punkt-Bestätigung
-
-    const touch = e.changedTouches[0];
-    const p = _getCanvasPtrFromTouch(touch);
-    const snapped = snapToPixel(p);
-
-    // Punkt an Tool-Handler übergeben
-    // Prüfe zuerst Referenz-Erstellung
-    if (DRAWING_TOOLS.includes(state.tool) && handlePipeRefClick(snapped)) {
-      _mobileMag.hide();
-      return;
-    }
-
-    switch (state.tool) {
-      case 'ref':      handleRefClick(snapped); break;
-      case 'distance': handleDistanceClick(snapped); break;
-      case 'area':     handleAreaClick(snapped); break;
-      case 'circle':   handleCircleClick(snapped); break;
-      case 'arc':      handleArcClick(snapped); break;
-      case 'pipe':     handlePipeClick(snapped); break;
-    }
-
-    // Finish-Button für Multi-Punkt-Tools aktualisieren
-    _updateFinishBtn();
-
-    // Magnifier aktualisieren: Start-Lupe zeigt den gerade gesetzten Punkt
-    _updateMobileMagnifiers(snapped);
-
-    // Wenn Messung abgeschlossen (Tool-State zurückgesetzt), Lupen ausblenden
-    const toolDone =
-      (state.tool === 'ref' && state.refPoints.length === 0) ||
-      (state.tool === 'distance' && state.distPoints.length === 0) ||
-      (state.tool === 'circle' && !state.circleCenter) ||
-      (state.tool === 'arc' && state.arcStep === 0);
-    if (toolDone) {
-      _mobileMag.hide();
-    }
-  }, { capture: true });
-}
-
-// --- touchstart (Bubbling: Pinch + Pan) ---
-wrapper.addEventListener('touchstart', e => {
-  if (_touchOnOverlay(e)) return;
-
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    _touchSuppressClick = true;
-    if (_mobileAdjust.active) { _mobileAdjust.active = false; _hideMobileCrosshair(); }
-    _touchState.type = 'pinch';
-    _touchState.lastDist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
-    _touchState.lastMid = {
-      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-    };
-    return;
-  }
-
-  if (e.touches.length === 1) {
-    if (Date.now() < _pinchCooldownUntil) {
-      _touchSuppressClick = true;
-      _touchState.type = 'cooldown';
-      return;
-    }
-    _touchState.type = 'single';
-    _touchState.startTime = Date.now();
-    _touchState.lastMid = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  }
-}, { passive: false });
-
-// --- touchmove (Pinch + Pan) ---
-wrapper.addEventListener('touchmove', e => {
-  if (e.touches.length === 2 && _touchState.type === 'pinch') {
-    e.preventDefault();
-    const dist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
-    const mid = {
-      x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-      y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-    };
-    const factor = dist / _touchState.lastDist;
-    const rect = wrapper.getBoundingClientRect();
-    setZoom(canvas.getZoom() * factor, {
-      x: mid.x - rect.left,
-      y: mid.y - rect.top,
-    });
-    const dx = mid.x - _touchState.lastMid.x;
-    const dy = mid.y - _touchState.lastMid.y;
-    const vpt = canvas.viewportTransform.slice();
-    vpt[4] += dx;
-    vpt[5] += dy;
-    canvas.setViewportTransform(vpt);
-    _touchState.lastDist = dist;
-    _touchState.lastMid = mid;
-    return;
-  }
-
-  if (e.touches.length === 1 && _touchState.type === 'single' && state.tool === 'select') {
-    e.preventDefault();
-    const t = e.touches[0];
-    if (_touchState.lastMid) {
-      const dx = t.clientX - _touchState.lastMid.x;
-      const dy = t.clientY - _touchState.lastMid.y;
-      const vpt = canvas.viewportTransform.slice();
-      vpt[4] += dx;
-      vpt[5] += dy;
-      canvas.setViewportTransform(vpt);
-    }
-    _touchState.lastMid = { x: t.clientX, y: t.clientY };
-  }
-}, { passive: false });
-
-// --- touchend (Pinch-Cooldown) ---
-wrapper.addEventListener('touchend', e => {
-  if (e.touches.length === 0) {
-    if (_touchState.type === 'pinch') {
-      _pinchCooldownUntil = Date.now() + _PINCH_COOLDOWN_MS;
-      _touchSuppressClick = true;
-    }
-    _touchState.type = null;
-    _touchState.lastMid = null;
-  }
-}, { passive: true });
-
-// =========================================================
-// MOBILE: CANVAS-GRÖßE BEI ORIENTATION-CHANGE
-// =========================================================
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    canvas.setWidth(wrapper.clientWidth);
-    canvas.setHeight(wrapper.clientHeight);
-    canvas.renderAll();
-  }, 200);
-});
-
-// Verhindere Browser-Doppeltipp-Zoom auf Touch-Geräten
-document.addEventListener('dblclick', e => {
-  if (_isTouchDevice) e.preventDefault();
-}, { passive: false });
+initOrientationChange();
