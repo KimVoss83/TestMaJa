@@ -96,6 +96,8 @@ export function finishArea() {
     fill: state.color + '33', stroke: state.color, strokeWidth: state.lineWidth,
     selectable: true, evented: true, _measureId: id,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
 
   const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
@@ -186,6 +188,8 @@ export function updateAreaFromHandles() {
     fill: color + '33', stroke: color, strokeWidth: lineWidth,
     selectable: false, evented: false, _measureId: id,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
   canvas.add(newPoly);
   // Send polygon behind handles
