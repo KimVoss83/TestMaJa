@@ -1,34 +1,33 @@
-import { PIPE_TYPES, state, measureId, nextMeasureId, setMeasureId, CANVAS_SERIAL_PROPS, _isTouchDevice, TOUCH_SCALE } from './state.js';
-import { canvas, wrapper, _safeHandler, showZoomHUD, setZoom, zoomToFit, startPan, stopPan } from './canvas.js';
-import { history, registerRestoreHook, getSnapshot, saveSnapshot, restoreSnapshot, undo, redo, updateUndoRedoButtons } from './undo.js';
-import { showToast, haptic, showMeasurementToast, createModal } from './ui/modals.js';
-import { snapToPixel, projectPointOnLine, closestPointOnSegment, addLabel, addEndpointDot, addRefEndmarks, addTickMarks, ptDist, pointToSegmentDist, polygonArea, formatDistance, formatArea, formatErr } from './utils/helpers.js';
+import { state, _isTouchDevice } from './state.js';
+import { canvas, wrapper, _safeHandler, setZoom, zoomToFit, startPan, stopPan } from './canvas.js';
+import { history, registerRestoreHook, saveSnapshot, undo, redo, updateUndoRedoButtons } from './undo.js';
+import { createModal } from './ui/modals.js';
+import { snapToPixel, ptDist, pointToSegmentDist, formatDistance } from './utils/helpers.js';
 import * as _loupe from './utils/loupe.js';
 import { throttledRender } from './utils/loupe.js';
-import { drawGrid, toggleGrid, setGridStep, setGridColor, setGridOpacity } from './ui/grid.js';
-import { MATERIALS, openMaterialCalc } from './ui/materialrechner.js';
-import { _prevCounts, _notifyBadge } from './ui/statusbar.js';
+import { drawGrid } from './ui/grid.js';
+import './ui/materialrechner.js'; // side-effect: sets window.openMaterialCalc
 import { showWelcomeOnboarding } from './onboarding/welcome.js';
-import { initRefOnboarding, showRefOnboarding } from './onboarding/ref-onboarding.js';
+import { initRefOnboarding } from './onboarding/ref-onboarding.js';
 import { initWhatsNew } from './ui/whats-new.js';
-import { TOOL_NAMES, TOOL_HINTS, MEASURE_TOOLS, setTool, requireScale, updateMeasureButtons, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
+import { TOOL_HINTS, setTool, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
 import { handleDistanceClick, finishDistance } from './tools/distance.js';
 import { handleAreaClick, updatePreviewPolygon, finishArea } from './tools/area.js';
 import { handleCircleClick, updatePreviewCircle, finishCircle } from './tools/circle.js';
-import { handleArcClick, updatePreviewArc, arcSweepDir, buildSectorPath, finishArc } from './tools/arc.js';
+import { handleArcClick, updatePreviewArc, finishArc } from './tools/arc.js';
 import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
-import { SENSOR_DB, lookupSensor, calcGSD, calcAccuracy, calcRequiredForTarget, calcFlightRecommendation, flightRecommendationTableHTML, distErr_m, areaRelErr_pct, showAccuracyDetail, hideAccuracyDetail } from './io/photogrammetry.js';
-import { handleRefClick, promptReference, updateRefStatus } from './tools/ref.js';
-import { PIPE_LINE_WIDTH, handlePipeClick, updatePreviewPipe, finishPipe, startPipeEdit, endPipeEdit, updatePipeFromHandles, insertPipeVertex, deletePipeVertex, togglePipeLayer, sendPipesToBack, offsetOverlappingPipes, updatePipePanel } from './tools/pipe.js';
-import { PIPE_REF_LINE_COLOR, PIPE_REF_GUIDE_COLOR, handlePipeRefClick, promptPipeRefName, createPipeRefLine, createPipeRefPoint, removePipeRef, togglePipeRef, updatePipeRefList, setPipeRefId, resetPipeRefId } from './tools/pipe-refs.js';
-import { clearPipeDistanceGuides, showPipeDistanceGuides, computeDimLine, renderDimLinesForPipe, renderAllDimLines, clearDimLinesForPipe } from './ui/pipe-guides.js';
-import { startAssignMode, endAssignMode, confirmAssignMode, cancelAssignMode, toggleRefAssignment, directToggleRef } from './ui/pipe-assign.js';
+import { distErr_m, areaRelErr_pct, hideAccuracyDetail } from './io/photogrammetry.js';
+import { handleRefClick, updateRefStatus } from './tools/ref.js';
+import { handlePipeClick, updatePreviewPipe, finishPipe, startPipeEdit, endPipeEdit, updatePipeFromHandles, insertPipeVertex, deletePipeVertex, sendPipesToBack, updatePipePanel } from './tools/pipe.js';
+import { PIPE_REF_LINE_COLOR, handlePipeRefClick, removePipeRef, updatePipeRefList, resetPipeRefId } from './tools/pipe-refs.js';
+import { clearPipeDistanceGuides, showPipeDistanceGuides, renderDimLinesForPipe, renderAllDimLines } from './ui/pipe-guides.js';
+import { confirmAssignMode, cancelAssignMode, toggleRefAssignment } from './ui/pipe-assign.js';
 import { updatePipeLegend } from './ui/pipe-legend.js';
-import { updateMeasurementList, removeMeasurement, toggleAcc, openAccSection, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
-import { LIBRARY, LIB_CATS, EIGENE_CAT, renderLibrary, placeLibraryItem, placeCustomLibItem, toggleLibLayer, initCustomLib, linkCustomLibFolder, refreshFromDir, uploadCustomLibFiles, deleteCustomLibItem, sanitizeSVG } from './io/library.js';
-import { loadFileAuto, loadImageFromDataUrl, readAndApplyExif } from './io/image-loader.js';
-import { openSaveModal, openLoadModal, doSavePNG, doSavePDF, doSaveProjectJSON } from './io/save-load.js';
-import { exportLeitungen, handleLeitungenAlignClick } from './io/pipe-transfer.js';
+import { updateMeasurementList, removeMeasurement, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
+import './io/library.js'; // side-effect: inits custom lib, renders library, sets window.* for onclick
+import './io/image-loader.js'; // side-effect: sets up file-input and drag-drop handlers
+import './io/save-load.js'; // side-effect: sets window.openSaveModal, window.openLoadModal
+import { handleLeitungenAlignClick, _anchorExport, _anchorImport } from './io/pipe-transfer.js';
 import { initMobileDrawer, initBottomToolbar, initOrientationChange } from './mobile/drawer.js';
 import { initTouchHandlers, initTouchPinchPan, _mobileMag } from './mobile/touch.js';
 

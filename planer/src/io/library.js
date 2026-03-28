@@ -339,6 +339,12 @@ export function placeLibraryItem(item) {
   });
 }
 
+// Expose for inline onclick handlers in HTML
+window.linkCustomLibFolder = linkCustomLibFolder;
+window.uploadCustomLibFiles = uploadCustomLibFiles;
+window.refreshFromDir = refreshFromDir;
+window.deleteCustomLibItem = deleteCustomLibItem;
+
 // Init library (custom lib async, then render)
 initCustomLib()
   .catch(() => {}) // IndexedDB-Fehler isolieren

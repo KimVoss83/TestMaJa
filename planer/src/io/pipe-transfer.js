@@ -150,7 +150,7 @@ function _removeBanner() {
 
 // ── EXPORT: Ankerpunkte sammeln, dann speichern ───────────
 
-const _anchorExport = { active: false, step: 0, collected: [], markerObjs: [], pendingData: null };
+export const _anchorExport = { active: false, step: 0, collected: [], markerObjs: [], pendingData: null };
 
 export function exportLeitungen() {
   if (!state.backgroundImage) { showToast('Bitte zuerst ein Luftbild laden.', 'error'); return; }
@@ -283,7 +283,7 @@ function _handleAnchorExportClick(p) {
 
 // ── IMPORT: Ankerpunkte im neuen Bild setzen ─────────────
 
-const _anchorImport = { active: false, anchors: [], step: 0, clicked: [], markerObjs: [], data: null };
+export const _anchorImport = { active: false, anchors: [], step: 0, clicked: [], markerObjs: [], data: null };
 
 function _cancelAnchorImport() {
   _anchorImport.active = false;
