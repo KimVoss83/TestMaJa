@@ -12,7 +12,7 @@ import { initRefOnboarding } from './onboarding/ref-onboarding.js';
 import { initWhatsNew } from './ui/whats-new.js';
 import { TOOL_HINTS, setTool, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
 import { handleDistanceClick, finishDistance } from './tools/distance.js';
-import { handleAreaClick, updatePreviewPolygon, finishArea } from './tools/area.js';
+import { handleAreaClick, updatePreviewPolygon, finishArea, startAreaEdit, endAreaEdit, updateAreaFromHandles, getAreaSnap90, setAreaSnap90 } from './tools/area.js';
 import { handleCircleClick, updatePreviewCircle, finishCircle } from './tools/circle.js';
 import { handleArcClick, updatePreviewArc, finishArc } from './tools/arc.js';
 import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
@@ -133,6 +133,16 @@ canvas.on('mouse:down', _safeHandler(opt => {
   // 2-Punkt-Ausrichtung beim Einmessen von Leitungen
   if (handleLeitungenAlignClick(p)) return;
 
+  // End area edit when clicking on something that isn't an area handle or the edited polygon
+  if (state.tool === 'select' && state.editingArea && opt.target) {
+    if (!opt.target._areaHandle && opt.target !== state.editingArea.polygon) {
+      endAreaEdit(); saveSnapshot();
+    }
+  }
+  if (state.tool === 'select' && state.editingArea && !opt.target) {
+    endAreaEdit(); saveSnapshot();
+  }
+
   // End pipe edit when clicking on something that isn't a pipe handle or the edited pipe
   if (state.tool === 'select' && state.editingPipe && opt.target) {
     if (!opt.target._pipeHandle && opt.target !== state.editingPipe.polyline && !opt.target._isPipeLegend) {
@@ -173,6 +183,13 @@ canvas.on('mouse:up', _safeHandler(opt => {
   stopPan();
   // After handle drag, clear guides
   if (state.editingPipe) clearPipeDistanceGuides();
+}));
+
+// Area handle dragging — live update polygon + area label
+canvas.on('object:moving', _safeHandler(opt => {
+  const obj = opt.target;
+  if (!obj || !obj._areaHandle || !state.editingArea) return;
+  updateAreaFromHandles();
 }));
 
 // Pipe handle dragging — live update polyline + distance guides
@@ -280,6 +297,10 @@ canvas.on('mouse:dblclick', _safeHandler(opt => {
 
   // Werkzeug-spezifische Aktionen
   if (state.tool === 'area' && state.areaPoints.length >= 3) { finishArea(); return; }
+  // End area edit when double-clicking on empty area
+  if (state.tool === 'select' && state.editingArea && (!opt.target || (!opt.target._areaHandle && opt.target._measureId !== state.editingArea.id))) {
+    endAreaEdit(); saveSnapshot();
+  }
   if (state.tool === 'pipe' && state.pipePoints.length >= 2) { finishPipe(); return; }
   if (state.tool === 'arc' && state.arcStep === 2) { finishArc(snapToPixel(canvas.getPointer(opt.e))); return; }
 
@@ -288,6 +309,11 @@ canvas.on('mouse:dblclick', _safeHandler(opt => {
     const target = opt.target;
     // Ignore double-click on legend (just drag it)
     if (target && target._isPipeLegend) return;
+    // Double-click on area polygon → enter area edit mode
+    if (target && target.type === 'polygon' && target._measureId != null && !target._pipeType) {
+      startAreaEdit(target);
+      return;
+    }
     if (target && target._pipeType && target.type === 'polyline') {
       startPipeEdit(target);
       return;
@@ -407,6 +433,7 @@ document.addEventListener('keydown', e => {
     }
   }
   if (e.key === 'Escape') {
+    if (state.editingArea) { endAreaEdit(); saveSnapshot(); return; }
     if (state.editingPipe) { endPipeEdit(); return; }
     cancelDrawing();
   }
@@ -464,6 +491,7 @@ document.getElementById('btn-pipe-ref-point').onclick = () => {
 // =========================================================
 function cancelDrawing() {
   removeLiveLabel();
+  endAreaEdit();
   endPipeEdit();
   clearPipeDistanceGuides();
   if (state.refLine) { canvas.remove(state.refLine); state.refLine = null; }
@@ -515,6 +543,13 @@ initToolbar();
 
 document.getElementById('btn-undo').onclick = () => undo();
 document.getElementById('btn-redo').onclick = () => redo();
+
+// 90° snap toggle for area tool
+document.getElementById('btn-snap90').onclick = () => {
+  const btn = document.getElementById('btn-snap90');
+  setAreaSnap90(!getAreaSnap90());
+  btn.classList.toggle('active', getAreaSnap90());
+};
 
 document.getElementById('btn-clear-all').onclick = () => {
   createModal(
