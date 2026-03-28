@@ -344,6 +344,7 @@ window.linkCustomLibFolder = linkCustomLibFolder;
 window.uploadCustomLibFiles = uploadCustomLibFiles;
 window.refreshFromDir = refreshFromDir;
 window.deleteCustomLibItem = deleteCustomLibItem;
+window.toggleLibLayer = toggleLibLayer;
 
 // Init library (custom lib async, then render)
 initCustomLib()

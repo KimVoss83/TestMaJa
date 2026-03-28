@@ -323,3 +323,6 @@ export function showAccuracyDetail() {
 export function hideAccuracyDetail() {
   document.getElementById('acc-panel').classList.remove('open');
 }
+
+// Expose for inline onclick handlers
+window.showAccuracyDetail = showAccuracyDetail;

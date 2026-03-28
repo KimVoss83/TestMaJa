@@ -1,6 +1,5 @@
-import { state } from '../state.js';
+import { state, nextMeasureId } from '../state.js';
 import { canvas } from '../canvas.js';
-import { nextMeasureId } from '../state.js';
 import { saveSnapshot } from '../undo.js';
 import { addLabel, addEndpointDot, ptDist, formatDistance, formatArea } from '../utils/helpers.js';
 import { haptic, showMeasurementToast } from '../ui/modals.js';

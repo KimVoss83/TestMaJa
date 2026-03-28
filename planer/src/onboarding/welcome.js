@@ -200,3 +200,6 @@ export function showWelcomeOnboarding() {
 
   render();
 }
+
+// Expose for inline onclick handlers
+window.showWelcomeOnboarding = showWelcomeOnboarding;

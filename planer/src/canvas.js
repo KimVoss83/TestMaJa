@@ -66,3 +66,6 @@ export function stopPan() {
   wrapper.classList.remove('panning');
   if (!state.spacePan) canvas.defaultCursor = state.tool === 'select' ? 'default' : 'crosshair';
 }
+
+// Expose for inline onclick handlers
+window.zoomToFit = zoomToFit;

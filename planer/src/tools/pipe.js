@@ -3,9 +3,8 @@ import { canvas } from '../canvas.js';
 import { saveSnapshot } from '../undo.js';
 import { showToast } from '../ui/modals.js';
 import { addEndpointDot, formatDistance } from '../utils/helpers.js';
-import { callHook } from './tool-manager.js';
+import { callHook, TOOL_HINTS } from './tool-manager.js';
 import { _notifyBadge } from '../ui/statusbar.js';
-import { TOOL_HINTS } from './tool-manager.js';
 
 // =========================================================
 // PIPE TOOL
@@ -456,3 +455,6 @@ export function updatePipePanel() {
 
   panel.innerHTML = html;
 }
+
+// Expose for inline onclick handlers
+window.togglePipeLayer = togglePipeLayer;

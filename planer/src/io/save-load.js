@@ -1,4 +1,4 @@
-import { state, CANVAS_SERIAL_PROPS } from '../state.js';
+import { state, CANVAS_SERIAL_PROPS, PIPE_TYPES } from '../state.js';
 import { canvas } from '../canvas.js';
 import { showToast, createModal } from '../ui/modals.js';
 import { history, saveSnapshot, updateUndoRedoButtons } from '../undo.js';
@@ -9,7 +9,6 @@ import { updateMeasurementList } from '../ui/sidebar.js';
 import { updatePipeLegend } from '../ui/pipe-legend.js';
 import { updatePipeRefList, setPipeRefId } from '../tools/pipe-refs.js';
 import { calcAccuracy } from './photogrammetry.js';
-import { PIPE_TYPES } from '../state.js';
 
 // SAVE / LOAD  (Zentrales Modal)
 // =========================================================

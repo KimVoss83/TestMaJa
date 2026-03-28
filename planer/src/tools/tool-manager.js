@@ -1,4 +1,4 @@
-import { state, PIPE_TYPES } from '../state.js';
+import { state, PIPE_TYPES, _isTouchDevice } from '../state.js';
 import { canvas } from '../canvas.js';
 import { showToast } from '../ui/modals.js';
 
@@ -86,7 +86,7 @@ export function setTool(t) {
     if (btn) btn.classList.toggle('active', id === t);
   });
   // Sync mobile bottom toolbar
-  if (typeof _isTouchDevice !== 'undefined' && _isTouchDevice) {
+  if (_isTouchDevice) {
     document.querySelectorAll('#touch-toolbar button[id^="tt-"]').forEach(btn => {
       const tool = btn.id.replace('tt-', '');
       btn.classList.toggle('active', tool === t);
