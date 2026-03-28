@@ -33,30 +33,8 @@ import { initMobileDrawer, initBottomToolbar, initOrientationChange } from './mo
 import { initTouchHandlers, initTouchPinchPan, _mobileMag } from './mobile/touch.js';
 
 
-// =========================================================
-// LIBRARY — extracted to ./io/library.js
-// =========================================================
-
-
-// =========================================================
-// TOOL MANAGEMENT — extracted to ./tools/tool-manager.js
-// TOOL_NAMES, TOOL_HINTS, MEASURE_TOOLS, setTool, requireScale,
-// updateMeasureButtons, initToolManager, initToolbar imported above.
-// =========================================================
-
 // Init pipe ref list
 updatePipeRefList();
-
-// readAndApplyExif extracted to ./io/image-loader.js
-
-
-// =========================================================
-// IMAGE UPLOAD — extracted to ./io/image-loader.js
-// normalizeOrientation, loadImageFromDataUrl, loadImage, loadPdf,
-// loadFileAuto, drag-and-drop handlers imported above.
-// =========================================================
-
-// _loupe and throttledRender are imported from ./utils/loupe.js
 
 // =========================================================
 // TOUCH STATE (shared refs — declared here so canvas event handlers below can access them)
@@ -443,32 +421,8 @@ document.addEventListener('keydown', e => {
 });
 
 // =========================================================
-// DISTANCE TOOL — extracted to ./tools/distance.js
-// handleDistanceClick, finishDistance imported above.
+// PIPE REFERENCE CREATION SUB-MODES
 // =========================================================
-
-// =========================================================
-// AREA TOOL — extracted to ./tools/area.js
-// handleAreaClick, updatePreviewPolygon, finishArea imported above.
-// =========================================================
-
-// =========================================================
-// PIPE TOOL — extracted to ./tools/pipe.js
-// PIPE_LINE_WIDTH, handlePipeClick, updatePreviewPipe, finishPipe imported above.
-// =========================================================
-
-// =========================================================
-// PIPE EDITING — extracted to ./tools/pipe.js
-// startPipeEdit, endPipeEdit, updatePipeFromHandles, insertPipeVertex, deletePipeVertex imported above.
-// =========================================================
-
-// =========================================================
-// PIPE REFERENCES — extracted to ./tools/pipe-refs.js
-// PIPE_REF_LINE_COLOR, PIPE_REF_GUIDE_COLOR, handlePipeRefClick, promptPipeRefName,
-// createPipeRefLine, createPipeRefPoint, removePipeRef, togglePipeRef, updatePipeRefList imported above.
-// =========================================================
-
-// --- Reference creation sub-modes (button handlers stay here — need TOOL_HINTS/state.tool) ---
 document.getElementById('btn-pipe-ref-line').onclick = () => {
   if (state.pipeRefMode === 'line-1') {
     // Cancel
@@ -505,44 +459,6 @@ document.getElementById('btn-pipe-ref-point').onclick = () => {
   document.getElementById('btn-pipe-ref-line').classList.remove('active');
   document.getElementById('status-hint').textContent = 'Position des Hilfspunktes klicken …';
 };
-
-// clearPipeDistanceGuides, showPipeDistanceGuides, computeDimLine, renderDimLinesForPipe,
-// renderAllDimLines, clearDimLinesForPipe extracted to ./ui/pipe-guides.js
-
-// startAssignMode, endAssignMode, confirmAssignMode, cancelAssignMode,
-// toggleRefAssignment, directToggleRef extracted to ./ui/pipe-assign.js
-
-// updatePipeLegend extracted to ./ui/pipe-legend.js
-
-// drawGrid, toggleGrid, setGridStep, setGridColor, setGridOpacity are imported from ./ui/grid.js
-
-// =========================================================
-// PIPE LAYER TOGGLE & SIDEBAR PANEL — extracted to ./tools/pipe.js
-// togglePipeLayer, sendPipesToBack, offsetOverlappingPipes, updatePipePanel imported above.
-// =========================================================
-
-// =========================================================
-// CIRCLE TOOL — extracted to ./tools/circle.js
-// handleCircleClick, updatePreviewCircle, finishCircle imported above.
-// =========================================================
-
-// =========================================================
-// ARC / SECTOR TOOL — extracted to ./tools/arc.js
-// handleArcClick, updatePreviewArc, arcSweepDir, buildSectorPath, finishArc imported above.
-// =========================================================
-
-// =========================================================
-// LABEL TOOL — extracted to ./tools/label.js
-// handleLabelClick (was promptLabel), editLabel imported above.
-// =========================================================
-
-// =========================================================
-// LIVE LABEL — extracted to ./tools/label.js
-// updateLiveLabel, removeLiveLabel imported above.
-// =========================================================
-
-
-// distErr_m and areaRelErr_pct extracted to ./io/photogrammetry.js
 
 // =========================================================
 // CANCEL DRAWING
@@ -582,13 +498,9 @@ initToolManager({
   mobileMagHide: () => { if (typeof _mobileMag !== 'undefined') _mobileMag.hide(); },
 });
 
-// MATERIALS and openMaterialCalc are imported from ./ui/materialrechner.js
-
 // =========================================================
 // REGISTER HOOKS FOR TOOL MODULES
 // =========================================================
-// These allow tool modules (distance, area, circle, arc) to call back into main.js
-// for functions that are still defined here.
 registerToolHook('removeLiveLabel', removeLiveLabel);
 registerToolHook('updateMeasurementList', updateMeasurementList);
 registerToolHook('distErr_m', distErr_m);
@@ -600,22 +512,7 @@ registerToolHook('clearPipeDistanceGuides', clearPipeDistanceGuides);
 registerToolHook('updatePipeLegend', updatePipeLegend);
 registerToolHook('renderDimLinesForPipe', renderDimLinesForPipe);
 
-// window.removeMeasurement is set in ./ui/sidebar.js
-// window.toggleAcc is set in ./ui/sidebar.js
-// window.directToggleRef is set in ./ui/pipe-assign.js
-
-// Init toolbar buttons, pickers, and line-width controls (extracted to tool-manager.js)
 initToolbar();
-
-// SAVE / LOAD — extracted to ./io/save-load.js
-// openSaveModal, openLoadModal, doSavePNG, doSavePDF, doSaveProjectJSON imported above.
-// =========================================================
-
-// =========================================================
-// LEITUNGEN EXPORTIEREN / EINMESSEN — extracted to ./io/pipe-transfer.js
-// exportLeitungen, handleLeitungenAlignClick imported above.
-// =========================================================
-
 
 document.getElementById('btn-undo').onclick = () => undo();
 document.getElementById('btn-redo').onclick = () => redo();
@@ -686,9 +583,6 @@ registerRestoreHook(() => renderAllDimLines());
   if (gc) { gc.width = wrapper.clientWidth; gc.height = wrapper.clientHeight; }
 })();
 
-// =========================================================
-// SIDEBAR RESIZE
-// =========================================================
 initSidebarResize();
 
 // Redraw grid after every Fabric.js render (covers zoom + pan)
@@ -698,8 +592,6 @@ canvas.on('after:render', () => {
   _gridRafPending = true;
   requestAnimationFrame(() => { _gridRafPending = false; drawGrid(); });
 });
-
-// toggleAcc, openAccSection, resizeLabelCluster imported from ./ui/sidebar.js
 
 updateRefStatus();
 updateMeasurementList();
@@ -741,19 +633,12 @@ document.addEventListener('click', e => {
   }
 });
 
-// =========================================================
-// RELEASE NOTES & BUG REPORT — init (extracted to ui/whats-new.js)
-// =========================================================
 initWhatsNew();
 
 // =========================================================
-// MOBILE: DRAWER TOGGLE — extracted to ./mobile/drawer.js
+// MOBILE
 // =========================================================
 const { openDrawer } = initMobileDrawer();
-
-// =========================================================
-// MOBILE: TOUCH EVENTS FÜR CANVAS — extracted to ./mobile/touch.js
-// =========================================================
 
 // ── Mobile Onboarding dismiss ──
 document.getElementById('mobile-ob-dismiss').onclick = () => {
@@ -771,15 +656,10 @@ if (_isTouchDevice) {
 }
 
 // =========================================================
-// MOBILE: BOTTOM TOUCH TOOLBAR — extracted to ./mobile/drawer.js
-// =========================================================
 initBottomToolbar({ openDrawer });
 
 // Wire up touch handlers (capture-phase point adjustment + pinch/pan)
 initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust });
 initTouchPinchPan({ _touchSuppressClickRef, _mobileAdjust });
 
-// =========================================================
-// MOBILE: CANVAS-GRÖßE BEI ORIENTATION-CHANGE — extracted to ./mobile/drawer.js
-// =========================================================
 initOrientationChange();
