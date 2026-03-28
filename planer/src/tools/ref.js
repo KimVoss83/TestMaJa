@@ -62,7 +62,7 @@ export function promptReference(pxLen) {
           state.scale = num / den;      // px/m (KQ-Schätzwert)
           state.refSumL2 = den;         // Σ Lᵢ² für Fehlerformel
           state.scaleSource = 'ref';
-          state.refLine.set({ strokeWidth: 0.5, selectable: true, evented: true, _isRef: true, lockMovementX: true, lockMovementY: true });
+          state.refLine.set({ strokeWidth: 0.5, selectable: true, evented: true, _isRef: true, lockMovementX: true, lockMovementY: true, hasControls: false, hasBorders: false, lockScalingX: true, lockScalingY: true, lockRotation: true });
           const unitStr = { '1': 'm', '0.01': 'cm', '0.001': 'mm' }[String(unit)];
           addRefEndmarks(state.refLine, '#cc0000', null);
           addLabel(

@@ -44,6 +44,8 @@ export function finishDistance(p2) {
     stroke: state.color, strokeWidth: state.lineWidth,
     selectable: true, evented: true, _measureId: id,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
 
   canvas.add(line);

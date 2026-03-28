@@ -57,6 +57,8 @@ export function finishPipe() {
     selectable: true, evented: true,
     _measureId: id, _pipeType: pipeType, _pipeDepth: depth,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
   canvas.add(line);
 
@@ -87,6 +89,8 @@ export function finishPipe() {
       selectable: true, evented: true,
       _measureId: id, _pipeType: pipeType, _isPipeTag: true,
       lockMovementX: true, lockMovementY: true,
+      hasControls: false, hasBorders: false,
+      lockScalingX: true, lockScalingY: true, lockRotation: true,
     });
     canvas.add(pipeTag);
   }

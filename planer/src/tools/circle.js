@@ -62,6 +62,8 @@ export function finishCircle(edgePt) {
     fill: state.color + '26', stroke: state.color, strokeWidth: state.lineWidth,
     selectable: true, evented: true, _measureId: id,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
 
   // Radius line from center to right edge (horizontal)

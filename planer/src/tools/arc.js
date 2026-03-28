@@ -84,6 +84,8 @@ export function buildSectorPath(center, r, startAngle, endAngle, color, sw, swee
     fill: color + '33', stroke: color, strokeWidth: sw ?? state.lineWidth,
     selectable: true, evented: true,
     lockMovementX: true, lockMovementY: true,
+    hasControls: false, hasBorders: false,
+    lockScalingX: true, lockScalingY: true, lockRotation: true,
   });
 }
 
