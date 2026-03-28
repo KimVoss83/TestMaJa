@@ -86,6 +86,7 @@ export const state = {
   activePipeRefs: [],         // IDs der aktiven Referenzen für Abstandsanzeige
   pipeRefMode: null,          // null | 'line-1' | 'line-2' | 'point' — sub-mode für Ref-Erstellung
   pipeRefTempPt: null,        // erster Punkt einer Ref-Linie
+  parallelSnap: null,         // { refId, distancePx } — aktiver Parallel-Snap für Pipe-Tool
 
   backgroundImage: null,
   zoom: 1,

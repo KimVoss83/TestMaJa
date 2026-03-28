@@ -30,6 +30,7 @@ import './io/save-load.js'; // side-effect: sets window.openSaveModal, window.op
 import { handleLeitungenAlignClick, _anchorExport, _anchorImport } from './io/pipe-transfer.js';
 import { initMobileDrawer, initBottomToolbar, initOrientationChange } from './mobile/drawer.js';
 import { initTouchHandlers, initTouchPinchPan, _mobileMag } from './mobile/touch.js';
+import { applyParallelSnap, drawParallelPreview, deactivateParallelSnap, showParallelSnapModal } from './tools/pipe-parallel.js';
 
 
 // Init pipe ref list
@@ -91,8 +92,10 @@ canvas.on('mouse:move', _safeHandler(opt => {
   }
   // Pipe preview
   if (state.tool === 'pipe') {
+    const pipeP = applyParallelSnap(p);
+    drawParallelPreview(p);
     if (state.pipePoints.length > 0) {
-      updatePreviewPipe([...state.pipePoints, p]);
+      updatePreviewPipe([...state.pipePoints, pipeP]);
     }
   }
   // Distance guides for all measurement tools + pipe + Maßstab (when not in ref mode)
@@ -501,6 +504,7 @@ function cancelDrawing() {
   removeLiveLabel();
   endAreaEdit();
   endPipeEdit();
+  deactivateParallelSnap();
   clearPipeDistanceGuides();
   if (state.refLine) { canvas.remove(state.refLine); state.refLine = null; }
   state.refPoints = [];
@@ -546,6 +550,7 @@ registerToolHook('showPipeDistanceGuides', showPipeDistanceGuides);
 registerToolHook('clearPipeDistanceGuides', clearPipeDistanceGuides);
 registerToolHook('updatePipeLegend', updatePipeLegend);
 registerToolHook('renderDimLinesForPipe', renderDimLinesForPipe);
+registerToolHook('applyParallelSnap', applyParallelSnap);
 
 initToolbar();
 
@@ -558,6 +563,9 @@ document.getElementById('btn-snap90').onclick = () => {
   setAreaSnap90(!getAreaSnap90());
   btn.classList.toggle('active', getAreaSnap90());
 };
+
+// Parallel-Snap Button für Pipe-Tool
+document.getElementById('btn-parallel-snap').onclick = () => showParallelSnapModal();
 
 document.getElementById('btn-clear-all').onclick = () => {
   createModal(

@@ -14,8 +14,9 @@ const PIPE_OFFSET_PX = 3; // lateral offset when pipes overlap
 const PIPE_HANDLE_RADIUS = 4;
 
 export function handlePipeClick(p) {
-  state.pipePoints.push(p);
-  callHook('showPipeDistanceGuides', p);
+  const snapped = callHook('applyParallelSnap', p) || p;
+  state.pipePoints.push(snapped);
+  callHook('showPipeDistanceGuides', snapped);
   document.getElementById('status-hint').textContent =
     `${state.pipePoints.length} Punkt(e) gesetzt – Doppelklick zum Abschluss`;
 }
