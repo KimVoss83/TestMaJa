@@ -30,7 +30,7 @@ import './io/save-load.js'; // side-effect: sets window.openSaveModal, window.op
 import { handleLeitungenAlignClick, _anchorExport, _anchorImport } from './io/pipe-transfer.js';
 import { initMobileDrawer, initBottomToolbar, initOrientationChange } from './mobile/drawer.js';
 import { initTouchHandlers, initTouchPinchPan, _mobileMag } from './mobile/touch.js';
-import { applyParallelSnap, drawParallelPreview, deactivateParallelSnap, showParallelSnapModal } from './tools/pipe-parallel.js';
+import { applyParallelSnap, drawParallelPreview, deactivateParallelSnap, toggleParallelSnap, handleParallelClick, confirmParallelDist, getParallelMode } from './tools/pipe-parallel.js';
 
 
 // Init pipe ref list
@@ -173,7 +173,7 @@ canvas.on('mouse:down', _safeHandler(opt => {
     case 'circle':   handleCircleClick(p); break;
     case 'arc':      handleArcClick(p); break;
     case 'label':    handleLabelClick(p); break;
-    case 'pipe':     handlePipeClick(p); break;
+    case 'pipe':     if (!handleParallelClick(p)) handlePipeClick(p); break;
   }
 }));
 
@@ -565,7 +565,19 @@ document.getElementById('btn-snap90').onclick = () => {
 };
 
 // Parallel-Snap Button für Pipe-Tool
-document.getElementById('btn-parallel-snap').onclick = () => showParallelSnapModal();
+document.getElementById('btn-parallel-snap').onclick = () => toggleParallelSnap();
+
+// Parallel-Abstand inline bestätigen (Enter)
+document.getElementById('parallel-dist-inline').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); confirmParallelDist(); }
+  if (e.key === 'Escape') { e.preventDefault(); deactivateParallelSnap(); }
+});
+// Abstand sofort übernehmen wenn Wert geändert wird und schon aktiv
+document.getElementById('parallel-dist-inline').addEventListener('change', () => {
+  if (getParallelMode() === 'active' || state._parallelPendingRefId != null) {
+    confirmParallelDist();
+  }
+});
 
 document.getElementById('btn-clear-all').onclick = () => {
   createModal(
