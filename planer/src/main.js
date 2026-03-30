@@ -9,6 +9,7 @@ import { drawGrid } from './ui/grid.js';
 import './ui/materialrechner.js'; // side-effect: sets window.openMaterialCalc
 import { showWelcomeOnboarding } from './onboarding/welcome.js';
 import { initRefOnboarding } from './onboarding/ref-onboarding.js';
+import { showTutorial } from './onboarding/tutorial.js';
 import { initWhatsNew } from './ui/whats-new.js';
 import { TOOL_NAMES, TOOL_HINTS, setTool, initToolManager, initToolbar, registerToolHook } from './tools/tool-manager.js';
 import { handleDistanceClick, finishDistance } from './tools/distance.js';

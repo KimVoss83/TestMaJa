@@ -956,6 +956,78 @@
       to   { opacity: 1; transform: scale(1) translateY(0); }
     }
 
+    /* ── Tutorial ── */
+    .tut-card { max-width: 520px !important; }
+    .tut-preview {
+      border-radius: 10px; overflow: hidden; margin-bottom: 12px;
+      border: 1px solid #e5e7eb; max-height: 180px;
+    }
+    .tut-preview img { width: 100%; height: auto; display: block; object-fit: cover; }
+    .tut-desc { font-size: 13px; color: #555; margin: 8px 0 10px; }
+    .tut-checklist {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px;
+    }
+    .tut-check-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: #374151; padding: 5px 8px;
+      background: #f9fafb; border-radius: 6px; border: 1px solid #f0f0f0;
+    }
+    .tut-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #8B3DFF; color: #fff; font-size: 10px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .tut-action {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: #f3f0ff; border: 1px solid rgba(139,61,255,0.15);
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+    }
+    .tut-action-icon { color: #8B3DFF; flex-shrink: 0; margin-top: 2px; }
+    .tut-action-text { font-size: 12px; color: #374151; line-height: 1.5; }
+    .tut-steps-mini {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-bottom: 10px;
+    }
+    .tut-mini-step {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: #555; padding: 4px 6px;
+      background: #fafafa; border-radius: 5px;
+    }
+    .tut-features { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+    .tut-feature {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 6px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .tut-feature:last-child { border-bottom: none; }
+    .tut-feature-icon {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; color: #8B3DFF; flex-shrink: 0;
+      background: #f3f0ff; border-radius: 6px;
+    }
+    .tut-feature-title { font-size: 12px; font-weight: 600; color: #1d1d1f; }
+    .tut-feature-desc { font-size: 11px; color: #6b7280; line-height: 1.4; }
+    .tut-tip {
+      font-size: 11px; color: #555; line-height: 1.5;
+      background: rgba(139,61,255,0.05); border: 1px solid rgba(139,61,255,0.12);
+      border-radius: 7px; padding: 8px 10px;
+    }
+    .tut-pipe-types {
+      display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; justify-content: center;
+    }
+    .tut-pipe-dot {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 22px; border-radius: 5px; color: #fff;
+      font-size: 9px; font-weight: 700; font-family: monospace;
+    }
+    .tut-highlight {
+      box-shadow: 0 0 0 3px #8B3DFF, 0 0 12px rgba(139,61,255,0.4) !important;
+      position: relative; z-index: 10;
+      animation: tut-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes tut-pulse {
+      0%, 100% { box-shadow: 0 0 0 3px #8B3DFF, 0 0 12px rgba(139,61,255,0.4); }
+      50% { box-shadow: 0 0 0 5px #8B3DFF, 0 0 20px rgba(139,61,255,0.5); }
+    }
+
     /* ── Help popover ── */
     #help-popover {
       position: fixed;
@@ -1901,9 +1973,13 @@
 
 <!-- Help Popover -->
 <div id="help-popover">
+  <button onclick="document.getElementById('help-popover').classList.remove('open'); showTutorial();"
+    style="width:100%;padding:9px 11px;background:#8B3DFF;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:6px;">
+    Interaktives Tutorial
+  </button>
   <button onclick="document.getElementById('help-popover').classList.remove('open'); showWelcomeOnboarding();"
-    style="width:100%;padding:9px 11px;background:#8B3DFF;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px;">
-    Kurzanleitung anzeigen
+    style="width:100%;padding:7px 11px;background:#f3f0ff;color:#8B3DFF;border:1px solid rgba(139,61,255,0.2);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px;">
+    Kurzanleitung
   </button>
   <div style="font-size:12px;font-weight:700;color:#1d1d1f;margin-bottom:8px;">Tastenkürzel</div>
   <div class="help-row"><span class="help-key">Auswahl</span><span class="help-val">Klick + Ziehen</span></div>
