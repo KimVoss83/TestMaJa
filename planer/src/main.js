@@ -63,14 +63,19 @@ canvas.on('mouse:move', _safeHandler(opt => {
     state.drawingLine.set({ x2: p.x, y2: p.y });
     throttledRender();
   }
+  // Distance parallel preview (auch ohne gesetzten Punkt)
+  if (state.tool === 'distance') {
+    drawParallelPreview(p);
+  }
   // Distance preview mit Live-Messwert
   if (state.tool === 'distance' && state.distPoints.length === 1 && state.drawingLine) {
-    state.drawingLine.set({ x2: p.x, y2: p.y });
+    const distP = applyParallelSnap(p);
+    state.drawingLine.set({ x2: distP.x, y2: distP.y });
     const p1 = state.distPoints[0];
-    const pxDist = ptDist(p1.x, p1.y, p.x, p.y) / state.imgDisplayScale;
+    const pxDist = ptDist(p1.x, p1.y, distP.x, distP.y) / state.imgDisplayScale;
     const meters = state.scale ? pxDist / state.scale : null;
     const liveText = meters ? formatDistance(meters) : `${Math.round(pxDist)} px`;
-    updateLiveLabel(p1, p, liveText);
+    updateLiveLabel(p1, distP, liveText);
     throttledRender();
   }
   // Area preview
@@ -168,7 +173,7 @@ canvas.on('mouse:down', _safeHandler(opt => {
 
   switch (state.tool) {
     case 'ref':      handleRefClick(p); break;
-    case 'distance': handleDistanceClick(p); break;
+    case 'distance': if (!handleParallelClick(p)) handleDistanceClick(applyParallelSnap(p)); break;
     case 'area':     handleAreaClick(p); break;
     case 'circle':   handleCircleClick(p); break;
     case 'arc':      handleArcClick(p); break;
