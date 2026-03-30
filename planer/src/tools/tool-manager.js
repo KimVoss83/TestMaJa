@@ -119,6 +119,9 @@ export function setTool(t) {
   }
   const REF_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
   if (!REF_TOOLS.includes(t)) { state.pipeRefMode = null; state.pipeRefTempPt = null; }
+  // Hilfslinien-/Hilfspunkt-Buttons immer deaktivieren beim Werkzeugwechsel
+  document.getElementById('btn-pipe-ref-line')?.classList.remove('active');
+  document.getElementById('btn-pipe-ref-point')?.classList.remove('active');
   // Sections stay collapsed — notification badges show new items
 }
 

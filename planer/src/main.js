@@ -460,14 +460,18 @@ document.addEventListener('keydown', e => {
 // =========================================================
 // PIPE REFERENCE CREATION SUB-MODES
 // =========================================================
-// Helfer: Tool-Button deaktivieren/reaktivieren wenn Hilfslinien-Modus aktiv
+// Helfer: ALLE Tool-Buttons deaktivieren/reaktivieren wenn Hilfslinien-Modus aktiv
 function _dimToolBtn() {
-  const btn = document.getElementById('btn-' + state.tool);
-  if (btn) btn.classList.remove('active');
+  Object.keys(TOOL_NAMES).forEach(id => {
+    const btn = document.getElementById('btn-' + id);
+    if (btn) btn.classList.remove('active');
+  });
 }
 function _restoreToolBtn() {
-  const btn = document.getElementById('btn-' + state.tool);
-  if (btn) btn.classList.add('active');
+  Object.keys(TOOL_NAMES).forEach(id => {
+    const btn = document.getElementById('btn-' + id);
+    if (btn) btn.classList.toggle('active', id === state.tool);
+  });
 }
 
 document.getElementById('btn-pipe-ref-line').onclick = () => {
