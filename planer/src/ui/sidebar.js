@@ -27,11 +27,14 @@ export function updateMeasurementList() {
     return;
   }
   list.innerHTML = nonPipe.map(m => {
+    const edgeToggle = m.type === 'area'
+      ? `<button class="m-edge-toggle" onclick="toggleAreaEdgeLabels(${m.id})" title="Kantenlängen ein-/ausblenden"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4"/><path d="M18 12h4"/><path d="M6 8v8"/><path d="M18 8v8"/></svg></button>`
+      : '';
     return `
     <div class="measurement-item">
       <div class="m-label">
         <span>${TYPE_ICONS[m.type] || '•'} ${TYPE_LABELS[m.type] || m.type}</span>
-        <span class="m-btns"><button class="m-calc" onclick="openMaterialCalc(${m.id})" title="Materialrechner"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg></button><button class="m-delete" onclick="removeMeasurement(${m.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
+        <span class="m-btns">${edgeToggle}<button class="m-calc" onclick="openMaterialCalc(${m.id})" title="Materialrechner"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg></button><button class="m-delete" onclick="removeMeasurement(${m.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
       </div>
       <div class="m-value">${m.label}</div>
     </div>`;
@@ -153,3 +156,12 @@ export function resizeLabelCluster(clusterKey, newSize) {
 // Expose for inline onclick handlers in HTML and in pipe panel HTML
 window.toggleAcc = toggleAcc;
 window.removeMeasurement = removeMeasurement;
+
+function toggleAreaEdgeLabels(measureId) {
+  const edgeLabels = canvas.getObjects().filter(o => o._measureId === measureId && o._areaEdgeLabel);
+  if (!edgeLabels.length) return;
+  const visible = edgeLabels[0].visible !== false;
+  edgeLabels.forEach(l => { l.visible = !visible; });
+  canvas.renderAll();
+}
+window.toggleAreaEdgeLabels = toggleAreaEdgeLabels;
