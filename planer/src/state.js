@@ -102,7 +102,8 @@ export const CANVAS_SERIAL_PROPS = ['_measureId','_isRef','_noSelect','_circlePr
   '_tempDraw','_pipeType','_isPipeLegend','_pipePreview','_pipeDepth','_origPoints','_pipeOffset',
   '_pipeRefId','_pipeRefType','_pipeRefName','_userLabel','_isBackground','_libItem','_customLib',
   '_dimLinePipeId','_dimDraggableFoot','_dimRefId','_dimMeasureId',
-  '_isPipeTag','_areaHandle','_areaHandleIdx','_areaHandleMeasureId'];
+  '_isPipeTag','_areaHandle','_areaHandleIdx','_areaHandleMeasureId',
+  '_areaEdgeLabel','_areaEdgeIdx'];
 
 export const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (_isTouchDevice) document.documentElement.classList.add('touch-device');

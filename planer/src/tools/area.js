@@ -1,7 +1,7 @@
 import { state, nextMeasureId } from '../state.js';
 import { canvas } from '../canvas.js';
 import { saveSnapshot } from '../undo.js';
-import { addLabel, polygonArea, formatArea } from '../utils/helpers.js';
+import { addLabel, polygonArea, formatArea, ptDist, formatDistance } from '../utils/helpers.js';
 import { haptic, showMeasurementToast } from '../ui/modals.js';
 import { TOOL_HINTS, callHook } from './tool-manager.js';
 
@@ -112,6 +112,10 @@ export function finishArea() {
 
   canvas.add(poly);
   const label = addLabel(cx, cy, labelText, state.color, id);
+
+  // Kantenbeschriftungen (Punkt-zu-Punkt Entfernungen)
+  addAreaEdgeLabels(pts, id, state.color);
+
   canvas.renderAll();
 
   state.measurements.push({ id, type: 'area', label: labelText, value: m2 });
@@ -121,6 +125,49 @@ export function finishArea() {
   document.getElementById('status-hint').textContent = TOOL_HINTS['area'];
   haptic('medium');
   showMeasurementToast(labelText);
+}
+
+// =========================================================
+// AREA EDGE LABELS — Punkt-zu-Punkt Entfernungen
+// =========================================================
+
+function addAreaEdgeLabels(pts, measureId, color) {
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const pxDist = ptDist(a.x, a.y, b.x, b.y) / state.imgDisplayScale;
+    const meters = state.scale ? pxDist / state.scale : null;
+    const text = meters ? formatDistance(meters) : `${Math.round(pxDist)} px`;
+
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    const offX = -Math.sin(angle) * 8;
+    const offY = Math.cos(angle) * 8;
+
+    const lbl = new fabric.Text(text, {
+      left: mx + offX, top: my + offY,
+      fontSize: 5, fontWeight: 'bold', fontFamily: 'monospace',
+      fill: color, backgroundColor: 'rgba(255,255,255,0.85)', padding: 1,
+      originX: 'center', originY: 'center',
+      selectable: true, evented: true,
+      _measureId: measureId, _areaEdgeLabel: true, _areaEdgeIdx: i,
+      lockMovementX: true, lockMovementY: true,
+      hasControls: false, hasBorders: false,
+      lockScalingX: true, lockScalingY: true, lockRotation: true,
+    });
+    canvas.add(lbl);
+  }
+}
+
+function updateAreaEdgeLabels(pts, measureId) {
+  const labels = canvas.getObjects().filter(o => o._measureId === measureId && o._areaEdgeLabel);
+  // Remove old edge labels
+  labels.forEach(l => canvas.remove(l));
+  // Find polygon color
+  const poly = canvas.getObjects().find(o => o._measureId === measureId && o.type === 'polygon');
+  const color = poly?.stroke || state.color;
+  addAreaEdgeLabels(pts, measureId, color);
 }
 
 // =========================================================
@@ -220,6 +267,9 @@ export function updateAreaFromHandles() {
     labelObj.set({ text: labelText, left: cx, top: cy });
     labelObj.setCoords();
   }
+
+  // Update edge labels
+  updateAreaEdgeLabels(newPts, id);
 
   // Update measurement in state
   const meas = state.measurements.find(m => m.id === id);
