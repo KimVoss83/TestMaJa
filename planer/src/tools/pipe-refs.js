@@ -4,6 +4,7 @@ import { saveSnapshot } from '../undo.js';
 import { createModal, showToast } from '../ui/modals.js';
 import { _notifyBadge } from '../ui/statusbar.js';
 import { updatePipePanel, sendPipesToBack } from './pipe.js';
+import { callHook } from './tool-manager.js';
 
 // =========================================================
 // PIPE REFERENCES — Grenzlinien & Referenzpunkte
@@ -44,6 +45,7 @@ export function handlePipeRefClick(p) {
     state.pipeRefMode = null;
     state.pipeRefTempPt = null;
     document.getElementById('btn-pipe-ref-line').classList.remove('active');
+    callHook('restoreToolBtn');
     return true;
   }
   if (state.pipeRefMode === 'point') {
@@ -53,6 +55,7 @@ export function handlePipeRefClick(p) {
     });
     state.pipeRefMode = null;
     document.getElementById('btn-pipe-ref-point').classList.remove('active');
+    callHook('restoreToolBtn');
     return true;
   }
   return false;

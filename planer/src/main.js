@@ -460,6 +460,16 @@ document.addEventListener('keydown', e => {
 // =========================================================
 // PIPE REFERENCE CREATION SUB-MODES
 // =========================================================
+// Helfer: Tool-Button deaktivieren/reaktivieren wenn Hilfslinien-Modus aktiv
+function _dimToolBtn() {
+  const btn = document.getElementById('btn-' + state.tool);
+  if (btn) btn.classList.remove('active');
+}
+function _restoreToolBtn() {
+  const btn = document.getElementById('btn-' + state.tool);
+  if (btn) btn.classList.add('active');
+}
+
 document.getElementById('btn-pipe-ref-line').onclick = () => {
   if (state.pipeRefMode === 'line-1') {
     // Cancel
@@ -467,12 +477,14 @@ document.getElementById('btn-pipe-ref-line').onclick = () => {
     canvas.getObjects().filter(o => o._pipeRefTemp).forEach(o => canvas.remove(o));
     document.getElementById('btn-pipe-ref-line').classList.remove('active');
     document.getElementById('tt-helpers')?.classList.remove('sub-active');
+    _restoreToolBtn();
     document.getElementById('status-hint').textContent = TOOL_HINTS[state.tool] || '';
     canvas.renderAll();
     return;
   }
   state.pipeRefMode = 'line-1';
   state.pipeRefTempPt = null;
+  _dimToolBtn();
   document.getElementById('btn-pipe-ref-line').classList.add('active');
   document.getElementById('tt-helpers')?.classList.add('sub-active');
   document.getElementById('tt-helpers')?.classList.remove('sub-active');
@@ -485,11 +497,13 @@ document.getElementById('btn-pipe-ref-point').onclick = () => {
     state.pipeRefMode = null;
     document.getElementById('btn-pipe-ref-point').classList.remove('active');
     document.getElementById('tt-helpers')?.classList.remove('sub-active');
+    _restoreToolBtn();
     document.getElementById('status-hint').textContent = TOOL_HINTS[state.tool] || '';
     return;
   }
   state.pipeRefMode = 'point';
   state.pipeRefTempPt = null;
+  _dimToolBtn();
   document.getElementById('btn-pipe-ref-point').classList.add('active');
   document.getElementById('tt-helpers')?.classList.add('sub-active');
   document.getElementById('tt-helpers')?.classList.remove('sub-active');
@@ -541,6 +555,7 @@ initToolManager({
 // REGISTER HOOKS FOR TOOL MODULES
 // =========================================================
 registerToolHook('removeLiveLabel', removeLiveLabel);
+registerToolHook('restoreToolBtn', _restoreToolBtn);
 registerToolHook('updateMeasurementList', updateMeasurementList);
 registerToolHook('distErr_m', distErr_m);
 registerToolHook('areaRelErr_pct', areaRelErr_pct);
