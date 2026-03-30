@@ -1543,7 +1543,6 @@
     <div class="tool-group">
       <button id="btn-distance" title="Distanz messen (2 Klicks)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2 8V2h6l13.3 13.3z"/><line x1="14" y1="13" x2="11" y2="10"/></svg></span> Distanz</button>
       <button id="btn-area" title="Polygon-Fläche (Doppelklick zum Abschluss)"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></span> Fläche</button>
-      <button id="btn-snap90" class="btn-sub" title="90°-Winkel einrasten"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 20 4 4 20 4"/><path d="M4 12h8v-8" opacity="0.4"/></svg></span> 90°</button>
       <button id="btn-circle" title="Kreis: Klick = Mittelpunkt, 2. Klick = Radius"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg></span> Kreis</button>
       <button id="btn-arc" title="Kreisabschnitt: 1. Klick = Mitte, 2. Klick = Startwinkel, 3. Klick = Endwinkel"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2"/><path d="M12 2v10l7.07 7.07"/></svg></span> Bogen</button>
       <button id="btn-pipe" title="Leitung einzeichnen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16"/><path d="M4 12h12"/><circle cx="20" cy="12" r="2"/><path d="M4 8h8"/></svg></span> Leitung</button>
@@ -1558,14 +1557,16 @@
         title="Nennweite (optional)" style="width:60px;font-size:11px;padding:3px 6px;
         border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;" />
     </div>
-    <div class="tool-group" id="parallel-group" style="display:none">
+    <div class="tool-group" id="draw-helpers-group" style="display:none">
+      <label style="font-size:10px;color:#888;">Zeichenhilfen</label>
+      <button id="btn-snap90" class="btn-sub" title="90°-Winkel einrasten"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 20 4 4 20 4"/><path d="M4 12h8v-8" opacity="0.4"/></svg></span> 90°</button>
       <button id="btn-parallel-snap" class="btn-sub" title="Parallel zu Hilfslinie zeichnen"><span class="btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/><line x1="12" y1="6" x2="12" y2="18" stroke-dasharray="3 2" opacity="0.4"/></svg></span> Parallel</button>
       <span id="parallel-dist-group" style="display:none;align-items:center;gap:4px;">
         <input type="number" id="parallel-dist-inline" placeholder="m" min="0.01" step="0.01"
           style="width:56px;font-size:11px;padding:3px 6px;border:1px solid #00BCD4;border-radius:6px;font-family:inherit;background:#e0f7fa;" />
         <span id="parallel-ref-name" style="font-size:10px;color:#00838f;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
       </span>
-  </div>
+    </div>
 
   <!-- Zeile 2: Formatierungen -->
   <div class="toolbar-row">

@@ -108,7 +108,8 @@ export function setTool(t) {
   document.getElementById('status-tool').textContent = 'Werkzeug: ' + TOOL_NAMES[t];
   document.getElementById('status-hint').textContent = TOOL_HINTS[t];
   document.getElementById('pipe-type-group').style.display = (t === 'pipe') ? '' : 'none';
-  document.getElementById('parallel-group').style.display = (t === 'pipe' || t === 'distance') ? '' : 'none';
+  const HELPER_TOOLS = ['distance', 'area', 'pipe'];
+  document.getElementById('draw-helpers-group').style.display = HELPER_TOOLS.includes(t) ? '' : 'none';
   // Mobile pipe bar
   const mpb = document.getElementById('mobile-pipe-bar');
   if (mpb) mpb.classList.toggle('visible', t === 'pipe');
