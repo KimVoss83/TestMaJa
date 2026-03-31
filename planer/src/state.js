@@ -105,6 +105,10 @@ export const CANVAS_SERIAL_PROPS = ['_measureId','_isRef','_noSelect','_circlePr
   '_isPipeTag','_areaHandle','_areaHandleIdx','_areaHandleMeasureId',
   '_areaEdgeLabel','_areaEdgeIdx'];
 
-export const _isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+// Touch-only Geräte: Touch vorhanden UND kein präziser Mauszeiger (hover)
+// → Laptops mit Touchscreen (Edge, Chrome) werden NICHT als mobil erkannt
+const _hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const _hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+export const _isTouchDevice = _hasTouch && !_hasMouse;
 if (_isTouchDevice) document.documentElement.classList.add('touch-device');
 export const TOUCH_SCALE = _isTouchDevice ? 1.5 : 1.0;
