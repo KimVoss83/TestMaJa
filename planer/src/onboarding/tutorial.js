@@ -253,8 +253,7 @@ export function showTutorial() {
   _tutOverlay = document.createElement('div');
   _tutOverlay.id = 'tutorial-ob';
   _tutOverlay.className = 'tut-overlay';
-  const container = document.getElementById('canvas-wrapper') || document.body;
-  container.appendChild(_tutOverlay);
+  document.body.appendChild(_tutOverlay);
 
   const close = () => {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
