@@ -152,8 +152,10 @@ export function doSavePNG() {
   const a = document.createElement('a');
   a.href = blobUrl;
   a.download = 'gartenplan.png';
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 5000);
 }
 
 document.getElementById('btn-save-png').onclick = doSavePNG;
@@ -286,38 +288,47 @@ export function doSavePDF() {
 document.getElementById('btn-save-pdf').onclick = doSavePDF;
 
 export function doSaveProjectJSON() {
-  endPipeEdit();
-  clearPipeDistanceGuides();
-  const data = {
-    version: 3,
-    scale: state.scale,
-    scaleSource: state.scaleSource,
-    imgDisplayScale: state.imgDisplayScale,
-    exifAltitude: state.exifAltitude,
-    refLines: state.refLines,
-    refSumL2: state.refSumL2,
-    imgOriginalWidth: state.imgOriginalWidth,
-    flightCam: state.flightCam || null,
-    fontSize: state.fontSize,
-    labelBg: state.labelBg,
-    gridStepM: state.gridStepM || 0,
-    gridColor: state.gridColor || '#ffffff',
-    gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
-    measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
-    pipeReferences: state.pipeReferences,
-    activePipeRefs: state.activePipeRefs,
-    canvas: canvas.toJSON(CANVAS_SERIAL_PROPS),
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const file = new File([blob], 'gartenplan.json', { type: 'application/json' });
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'Gartenplan' }).catch(() => {});
-    return;
+  try {
+    endPipeEdit();
+    clearPipeDistanceGuides();
+    const data = {
+      version: 3,
+      scale: state.scale,
+      scaleSource: state.scaleSource,
+      imgDisplayScale: state.imgDisplayScale,
+      exifAltitude: state.exifAltitude,
+      refLines: state.refLines,
+      refSumL2: state.refSumL2,
+      imgOriginalWidth: state.imgOriginalWidth,
+      flightCam: state.flightCam || null,
+      fontSize: state.fontSize,
+      labelBg: state.labelBg,
+      gridStepM: state.gridStepM || 0,
+      gridColor: state.gridColor || '#ffffff',
+      gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
+      measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
+      pipeReferences: state.pipeReferences,
+      activePipeRefs: state.activePipeRefs,
+      canvas: canvas.toJSON(CANVAS_SERIAL_PROPS),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const file = new File([blob], 'gartenplan.json', { type: 'application/json' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Gartenplan' }).catch(() => {});
+      return;
+    }
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl; a.download = 'gartenplan.json';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 5000);
+    showToast('Projekt gespeichert', 'success');
+  } catch (err) {
+    console.error('Speichern fehlgeschlagen:', err);
+    showToast('Fehler beim Speichern: ' + err.message, 'error');
   }
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = blobUrl; a.download = 'gartenplan.json'; a.click();
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
 }
 document.getElementById('btn-save-json').onclick = doSaveProjectJSON;
 
