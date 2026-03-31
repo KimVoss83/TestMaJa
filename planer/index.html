@@ -958,6 +958,17 @@
 
     /* ── Tutorial ── */
     .tut-card { max-width: 520px !important; }
+    #tutorial-ob.wob-overlay {
+      background: rgba(0,0,0,0.25);
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    #tutorial-ob ~ #toolbar,
+    body:has(#tutorial-ob) #toolbar {
+      z-index: 3001; position: relative;
+    }
+    body:has(#tutorial-ob) #sidebar {
+      z-index: 3001; position: relative;
+    }
     .tut-preview {
       border-radius: 10px; overflow: hidden; margin-bottom: 12px;
       border: 1px solid #e5e7eb; max-height: 180px;
@@ -1020,7 +1031,7 @@
     }
     .tut-highlight {
       box-shadow: 0 0 0 3px #8B3DFF, 0 0 12px rgba(139,61,255,0.4) !important;
-      position: relative; z-index: 10;
+      position: relative; z-index: 3002;
       animation: tut-pulse 1.2s ease-in-out infinite;
     }
     @keyframes tut-pulse {
