@@ -88,8 +88,9 @@ export function updatePreviewPolygon(pts) {
 
 export function finishArea() {
   if (state.drawingPolygon) { canvas.remove(state.drawingPolygon); state.drawingPolygon = null; }
-  // Doppelklick: mouse:down fügt vor mouse:dblclick einen Extra-Punkt hinzu → entfernen
-  if (state.areaPoints.length > 3) state.areaPoints.pop();
+  // Doppelklick: beide Klicks feuern mouse:down → 2 Extra-Punkte entfernen (min. 3 behalten)
+  const extraArea = Math.min(2, state.areaPoints.length - 3);
+  for (let i = 0; i < extraArea; i++) state.areaPoints.pop();
   const pts = state.areaPoints.slice();
   if (pts.length < 3) { state.areaPoints = []; return; }
 

@@ -41,6 +41,9 @@ export function finishPipe() {
   canvas.getObjects().filter(o => o._pipePreview).forEach(o => canvas.remove(o));
   callHook('clearPipeDistanceGuides');
   state.drawingPipeLine = null;
+  // Doppelklick: beide Klicks feuern mouse:down → 2 Extra-Punkte entfernen (min. 2 behalten)
+  const extraPipe = Math.min(2, state.pipePoints.length - 2);
+  for (let i = 0; i < extraPipe; i++) state.pipePoints.pop();
   const pts = state.pipePoints.slice();
   if (pts.length < 2) { state.pipePoints = []; return; }
 
