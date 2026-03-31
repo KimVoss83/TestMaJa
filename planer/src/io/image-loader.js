@@ -5,7 +5,7 @@ import { lookupSensor, calcGSD } from './photogrammetry.js';
 import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasureButtons } from '../tools/tool-manager.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
-import { showWelcomeOnboarding } from '../onboarding/welcome.js';
+import { showTutorial } from '../onboarding/tutorial.js';
 import { showRefOnboarding } from '../onboarding/ref-onboarding.js';
 
 // Absoluter Fehler in cm für eine Einzelmessung (Distanz in m).
@@ -270,7 +270,7 @@ export function loadFileAuto(file) {
 }
 
 // btn-upload ist jetzt ein <label for="file-input"> — kein JS nötig
-document.getElementById('btn-how-it-works').addEventListener('click', () => showWelcomeOnboarding());
+document.getElementById('btn-how-it-works').addEventListener('click', () => showTutorial());
 document.getElementById('file-input').onchange = e => { loadFileAuto(e.target.files[0]); };
 
 wrapper.addEventListener('dragover', e => { e.preventDefault(); wrapper.style.outline = '3px dashed #4ecca3'; });

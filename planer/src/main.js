@@ -7,7 +7,6 @@ import * as _loupe from './utils/loupe.js';
 import { throttledRender } from './utils/loupe.js';
 import { drawGrid } from './ui/grid.js';
 import './ui/materialrechner.js'; // side-effect: sets window.openMaterialCalc
-import { showWelcomeOnboarding } from './onboarding/welcome.js';
 import { initRefOnboarding } from './onboarding/ref-onboarding.js';
 import { showTutorial } from './onboarding/tutorial.js';
 import { initWhatsNew } from './ui/whats-new.js';
@@ -679,9 +678,9 @@ document.getElementById('fs-guide').addEventListener('input',   e => resizeLabel
 // Wire up ref-onboarding dependency on setTool
 initRefOnboarding({ setTool });
 
-// Welcome-Onboarding beim ersten Besuch
-if (!localStorage.getItem('gp_ob_seen')) {
-  showWelcomeOnboarding();
+// Tutorial beim ersten Besuch
+if (!localStorage.getItem('gp_tut_seen')) {
+  showTutorial();
 }
 
 // Acc-Panel Close

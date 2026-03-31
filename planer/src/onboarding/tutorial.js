@@ -256,8 +256,10 @@ export function showTutorial() {
   document.body.appendChild(_tutOverlay);
 
   const close = () => {
+    document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
     _tutOverlay.style.opacity = '0';
     setTimeout(() => { _tutOverlay.remove(); _tutOverlay = null; }, 200);
+    localStorage.setItem('gp_tut_seen', '1');
   };
 
   const goTo = (i) => {
