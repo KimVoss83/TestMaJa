@@ -1200,21 +1200,15 @@
 
     /* ── Tutorial ── */
 
-    .tut-card { max-width: 520px !important; }
-
-    #tutorial-ob.wob-overlay {
+    .tut-overlay {
+      position: absolute; inset: 0;
       background: rgba(0,0,0,0.25);
-      backdrop-filter: none; -webkit-backdrop-filter: none;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+      transition: opacity 0.2s;
     }
 
-    #tutorial-ob ~ #toolbar,
-    body:has(#tutorial-ob) #toolbar {
-      z-index: 3001; position: relative;
-    }
-
-    body:has(#tutorial-ob) #sidebar {
-      z-index: 3001; position: relative;
-    }
+    .tut-overlay .wob-card { max-width: 520px; }
 
     .tut-preview {
       border-radius: 10px; overflow: hidden; margin-bottom: 12px;
@@ -2218,8 +2212,8 @@
       </div>
       <div class="tut-tip" style="background:rgba(22,163,106,0.08);border-color:rgba(22,163,106,0.25);">
         <b>Tipp:</b> Du kannst dieses Tutorial jederzeit ueber den <b>"?"</b>-Button oben rechts erneut starten.
-      </div>`,cta:`Los geht's!`,ctaStyle:`green`,highlight:null}],U=null,W=0;function Ze(){U&&U.remove(),W=0,U=document.createElement(`div`),U.id=`tutorial-ob`,U.className=`wob-overlay`,document.body.appendChild(U);let e=()=>{document.querySelectorAll(`.tut-highlight`).forEach(e=>e.classList.remove(`tut-highlight`)),U.style.opacity=`0`,setTimeout(()=>{U.remove(),U=null},200),localStorage.setItem(`gp_tut_seen`,`1`)},t=e=>{W=Math.max(0,Math.min(Xe.length-1,e)),n()},n=()=>{let n=Xe[W],r=W===Xe.length-1,i=((W+1)/Xe.length*100).toFixed(0),a=Array.from({length:Xe.length},(e,t)=>`<div class="wob-dot ${t===W?`active`:``}" data-i="${t}"></div>`).join(``);if(document.querySelectorAll(`.tut-highlight`).forEach(e=>e.classList.remove(`tut-highlight`)),n.highlight){let e=document.getElementById(n.highlight);e&&e.classList.add(`tut-highlight`)}U.innerHTML=`
-      <div class="wob-card tut-card" style="animation:wob-in 0.22s cubic-bezier(.4,0,.2,1);">
+      </div>`,cta:`Los geht's!`,ctaStyle:`green`,highlight:null}],U=null,W=0;function Ze(){U&&U.remove(),W=0,U=document.createElement(`div`),U.id=`tutorial-ob`,U.className=`tut-overlay`,(document.getElementById(`canvas-wrapper`)||document.body).appendChild(U);let e=()=>{document.querySelectorAll(`.tut-highlight`).forEach(e=>e.classList.remove(`tut-highlight`)),U.style.opacity=`0`,setTimeout(()=>{U.remove(),U=null},200),localStorage.setItem(`gp_tut_seen`,`1`)},t=e=>{W=Math.max(0,Math.min(Xe.length-1,e)),n()},n=()=>{let n=Xe[W],r=W===Xe.length-1,i=((W+1)/Xe.length*100).toFixed(0),a=Array.from({length:Xe.length},(e,t)=>`<div class="wob-dot ${t===W?`active`:``}" data-i="${t}"></div>`).join(``);if(document.querySelectorAll(`.tut-highlight`).forEach(e=>e.classList.remove(`tut-highlight`)),n.highlight){let e=document.getElementById(n.highlight);e&&e.classList.add(`tut-highlight`)}U.innerHTML=`
+      <div class="wob-card" style="animation:wob-in 0.22s cubic-bezier(.4,0,.2,1);">
         <div class="wob-progress"><div class="wob-progress-bar" style="width:${i}%"></div></div>
         <div class="wob-body">
           <div class="wob-icon">${n.icon}</div>

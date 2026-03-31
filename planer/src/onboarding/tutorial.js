@@ -252,8 +252,9 @@ export function showTutorial() {
   _tutStep = 0;
   _tutOverlay = document.createElement('div');
   _tutOverlay.id = 'tutorial-ob';
-  _tutOverlay.className = 'wob-overlay';
-  document.body.appendChild(_tutOverlay);
+  _tutOverlay.className = 'tut-overlay';
+  const container = document.getElementById('canvas-wrapper') || document.body;
+  container.appendChild(_tutOverlay);
 
   const close = () => {
     document.querySelectorAll('.tut-highlight').forEach(el => el.classList.remove('tut-highlight'));
@@ -284,7 +285,7 @@ export function showTutorial() {
     }
 
     _tutOverlay.innerHTML = `
-      <div class="wob-card tut-card" style="animation:wob-in 0.22s cubic-bezier(.4,0,.2,1);">
+      <div class="wob-card" style="animation:wob-in 0.22s cubic-bezier(.4,0,.2,1);">
         <div class="wob-progress"><div class="wob-progress-bar" style="width:${pct}%"></div></div>
         <div class="wob-body">
           <div class="wob-icon">${sd.icon}</div>
