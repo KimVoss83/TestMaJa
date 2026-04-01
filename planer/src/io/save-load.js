@@ -30,7 +30,7 @@ export function openSaveModal() {
       <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du speichern?</p>
       <div id="sl-step1" style="display:flex;flex-direction:column;gap:6px;">
         ${_saveOptionHTML('save-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>', 'Gesamtes Projekt', 'Alle Messungen, Leitungen, Einstellungen')}
-        ${_saveOptionHTML('save-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Nur Leitungen', 'Leitungen mit Ankerpunkten für neues Luftbild')}
+        ${_saveOptionHTML('save-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Messungen transferieren', 'Alle Messungen & Leitungen mit Ankerpunkten für neues Bild')}
       </div>
       <div id="sl-step2" style="display:none;">
         <p style="margin:0 0 10px;color:#888;font-size:12px;">In welchem Format?</p>
@@ -100,7 +100,7 @@ export function openLoadModal() {
       <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du laden?</p>
       <div style="display:flex;flex-direction:column;gap:6px;">
         ${_saveOptionHTML('load-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', 'Projekt laden (.json)', 'Gespeichertes Projekt öffnen und weiterarbeiten')}
-        ${_saveOptionHTML('load-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Leitungen einmessen', 'Gespeicherte Leitungen in neues Luftbild übertragen')}
+        ${_saveOptionHTML('load-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Messungen einmessen', 'Gespeicherte Messungen in neues Bild übertragen')}
       </div>
       <div class="btn-row" style="margin-top:12px;">
         <button id="sl-close">Abbrechen</button>

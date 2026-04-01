@@ -134,7 +134,7 @@ export function finishArea() {
 // AREA EDGE LABELS — Punkt-zu-Punkt Entfernungen
 // =========================================================
 
-function addAreaEdgeLabels(pts, measureId, color) {
+export function addAreaEdgeLabels(pts, measureId, color) {
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i];
     const b = pts[(i + 1) % pts.length];
