@@ -61,7 +61,7 @@ function animRef() {
     </line>
     <!-- Tick marks -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.46;0.5;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.46;0.5;0.85;1"/>
       <line x1="80" y1="84" x2="80" y2="96" stroke="#4ecca3" stroke-width="1.5"/>
       <line x1="260" y1="84" x2="260" y2="96" stroke="#4ecca3" stroke-width="1.5"/>
     </g>
@@ -74,13 +74,13 @@ function animRef() {
     </circle>
     <!-- Label "12.50 m" -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.52;0.58;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.52;0.58;0.85;1"/>
       <rect x="137" y="62" width="66" height="20" rx="4" fill="rgba(255,255,255,0.92)"/>
       <text x="170" y="76" text-anchor="middle" fill="#333" font-size="11" font-weight="bold" font-family="monospace">12.50 m</text>
     </g>
     <!-- Dialog hint -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.55;0.62;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5s" repeatCount="indefinite" keyTimes="0;0.55;0.62;0.85;1"/>
       <rect x="120" y="105" width="100" height="28" rx="6" fill="rgba(255,255,255,0.95)" stroke="#8B3DFF" stroke-width="1"/>
       <text x="170" y="123" text-anchor="middle" fill="#6b7280" font-size="9" font-family="DM Sans,sans-serif">Laenge eingeben</text>
     </g>
@@ -98,11 +98,11 @@ function animGuideline() {
     ${animStageGrid()}
     <!-- Guideline being drawn -->
     <line x1="170" y1="15" x2="170" y2="155" stroke="#FF9500" stroke-width="1.5" stroke-dasharray="5 3" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.2;0.3;0.85;0.95"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.2;0.3;0.85;1"/>
     </line>
     <!-- Distance indicators appearing -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.4;0.5;0.85;0.95"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.4;0.5;0.85;1"/>
       <!-- Left distance -->
       <line x1="80" y1="85" x2="165" y2="85" stroke="rgba(255,149,0,0.5)" stroke-width="0.8" stroke-dasharray="3 2"/>
       <rect x="100" y="74" width="44" height="16" rx="3" fill="rgba(255,149,0,0.15)" stroke="rgba(255,149,0,0.3)" stroke-width="0.5"/>
@@ -114,14 +114,14 @@ function animGuideline() {
     </g>
     <!-- Reference point -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.55;0.65;0.85;0.95"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.55;0.65;0.85;1"/>
       <circle cx="80" cy="85" r="4" fill="none" stroke="#FF9500" stroke-width="1.5"/>
       <line x1="80" y1="77" x2="80" y2="93" stroke="#FF9500" stroke-width="1"/>
       <line x1="72" y1="85" x2="88" y2="85" stroke="#FF9500" stroke-width="1"/>
     </g>
     <!-- Cursor -->
     <g class="tut-cursor" opacity="0">
-      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.05;0.8;0.88;0.95"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4s" repeatCount="indefinite" keyTimes="0;0.05;0.8;0.88;1"/>
       <animateTransform attributeName="transform" type="translate" values="165,10;165,10;165,148;165,148" dur="4s" repeatCount="indefinite" keyTimes="0;0.15;0.35;1"/>
       ${CURSOR}
     </g>
@@ -153,19 +153,19 @@ function animDistance() {
     </circle>
     <!-- Label -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.58;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.58;0.85;1"/>
       <rect x="140" y="57" width="55" height="18" rx="4" fill="rgba(255,255,255,0.92)"/>
       <text x="167" y="70" text-anchor="middle" fill="#333" font-size="11" font-weight="bold" font-family="monospace">8.34 m</text>
     </g>
     <!-- Tick marks -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.85;1"/>
       <line x1="67" y1="83" x2="73" y2="97" stroke="#4ecca3" stroke-width="1.5"/>
       <line x1="267" y1="63" x2="273" y2="77" stroke="#4ecca3" stroke-width="1.5"/>
     </g>
     <!-- Cursor -->
     <g class="tut-cursor" opacity="0">
-      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.82;0.88;0.95"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.82;0.88;1"/>
       <animateTransform attributeName="transform" type="translate" values="55,82;65,85;65,85;265,64;265,64" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.13;0.2;0.46;1"/>
       ${CURSOR}
     </g>
@@ -178,47 +178,47 @@ function animArea() {
     <!-- Polygon points appearing one by one -->
     <!-- Point 1 -->
     <circle cx="80" cy="120" r="3" fill="#e74c3c" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.1;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.1;0.82;1"/>
     </circle>
     <!-- Point 2 -->
     <circle cx="100" cy="45" r="3" fill="#e74c3c" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.18;0.2;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.18;0.2;0.82;1"/>
     </circle>
     <!-- Point 3 -->
     <circle cx="240" cy="40" r="3" fill="#e74c3c" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.28;0.3;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.28;0.3;0.82;1"/>
     </circle>
     <!-- Point 4 -->
     <circle cx="270" cy="130" r="3" fill="#e74c3c" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.38;0.4;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.38;0.4;0.82;1"/>
     </circle>
     <!-- Edges drawing progressively -->
     <line x1="80" y1="120" x2="100" y2="45" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="80" stroke-dashoffset="80">
-      <animate attributeName="stroke-dashoffset" values="80;80;0;0;0;80" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.18;0.82;0.9;0.92"/>
+      <animate attributeName="stroke-dashoffset" values="80;80;0;0;0;80" dur="6s" repeatCount="indefinite" keyTimes="0;0.1;0.18;0.82;0.92;1"/>
     </line>
     <line x1="100" y1="45" x2="240" y2="40" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="140" stroke-dashoffset="140">
-      <animate attributeName="stroke-dashoffset" values="140;140;0;0;0;140" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.3;0.82;0.9;0.92"/>
+      <animate attributeName="stroke-dashoffset" values="140;140;0;0;0;140" dur="6s" repeatCount="indefinite" keyTimes="0;0.2;0.3;0.82;0.92;1"/>
     </line>
     <line x1="240" y1="40" x2="270" y2="130" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="95" stroke-dashoffset="95">
-      <animate attributeName="stroke-dashoffset" values="95;95;0;0;0;95" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.4;0.82;0.9;0.92"/>
+      <animate attributeName="stroke-dashoffset" values="95;95;0;0;0;95" dur="6s" repeatCount="indefinite" keyTimes="0;0.3;0.4;0.82;0.92;1"/>
     </line>
     <!-- Closing edge + fill on double-click -->
     <line x1="270" y1="130" x2="80" y2="120" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="190" stroke-dashoffset="190">
-      <animate attributeName="stroke-dashoffset" values="190;190;0;0;0;190" dur="6s" repeatCount="indefinite" keyTimes="0;0.48;0.55;0.82;0.9;0.92"/>
+      <animate attributeName="stroke-dashoffset" values="190;190;0;0;0;190" dur="6s" repeatCount="indefinite" keyTimes="0;0.48;0.55;0.82;0.92;1"/>
     </line>
     <!-- Polygon fill -->
     <polygon points="80,120 100,45 240,40 270,130" fill="rgba(231,76,60,0.15)" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.53;0.58;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.53;0.58;0.82;1"/>
     </polygon>
     <!-- Area label -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.58;0.65;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.58;0.65;0.82;1"/>
       <rect x="137" y="72" width="66" height="20" rx="4" fill="rgba(255,255,255,0.92)"/>
       <text x="170" y="86" text-anchor="middle" fill="#333" font-size="10" font-weight="bold" font-family="monospace">42.7 m²</text>
     </g>
     <!-- Edge labels -->
     <g opacity="0" font-size="8" fill="rgba(231,76,60,0.9)" font-family="monospace" font-weight="600">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.68;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.62;0.68;0.82;1"/>
       <text x="78" y="80" text-anchor="middle">4.2 m</text>
       <text x="170" y="36" text-anchor="middle">7.8 m</text>
       <text x="264" y="82" text-anchor="middle">5.1 m</text>
@@ -226,7 +226,7 @@ function animArea() {
     </g>
     <!-- Cursor -->
     <g class="tut-cursor" opacity="0">
-      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.03;0.5;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="6s" repeatCount="indefinite" keyTimes="0;0.03;0.5;0.85;1"/>
       <animateTransform attributeName="transform" type="translate" values="65,115;75,115;75,115;95,40;95,40;235,35;235,35;265,125;265,125;265,125" dur="6s" repeatCount="indefinite" keyTimes="0;0.08;0.12;0.2;0.23;0.3;0.33;0.4;0.46;1"/>
       ${CURSOR}
     </g>
@@ -243,27 +243,27 @@ function animCircle() {
     ${animStageGrid()}
     <!-- Center click -->
     <circle cx="170" cy="85" r="3" fill="#3498db" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.13;0.16;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.13;0.16;0.82;1"/>
     </circle>
     <circle cx="170" cy="85" r="7" class="tut-click-ring" stroke="#3498db">
       <animate attributeName="opacity" values="0;0;0.7;0;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.13;0.16;0.28;1"/>
     </circle>
     <!-- Circle being drawn -->
     <circle cx="170" cy="85" r="55" fill="rgba(52,152,219,0.1)" stroke="#3498db" stroke-width="1.5" stroke-dasharray="346" stroke-dashoffset="346">
-      <animate attributeName="stroke-dashoffset" values="346;346;0;0;0;346" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.2;0.5;0.82;0.9;0.92"/>
-      <animate attributeName="fill-opacity" values="0;0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.45;0.49;0.52;0.82;0.92"/>
+      <animate attributeName="stroke-dashoffset" values="346;346;0;0;0;346" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.2;0.5;0.82;0.9;1"/>
+      <animate attributeName="fill-opacity" values="0;0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.45;0.49;0.52;0.82;1"/>
     </circle>
     <!-- Radius line -->
     <line x1="170" y1="85" x2="225" y2="85" stroke="#3498db" stroke-width="1" stroke-dasharray="4 3" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.52;0.56;0.82;1"/>
     </line>
     <!-- Edge click -->
     <circle cx="225" cy="85" r="3" fill="#3498db" opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.46;0.49;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.46;0.49;0.82;1"/>
     </circle>
     <!-- Labels -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.55;0.62;0.82;0.92"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.55;0.62;0.82;1"/>
       <rect x="179" y="68" width="52" height="14" rx="3" fill="rgba(255,255,255,0.9)"/>
       <text x="205" y="79" text-anchor="middle" fill="#333" font-size="9" font-weight="bold" font-family="monospace">r = 3.2 m</text>
       <rect x="140" y="91" width="60" height="14" rx="3" fill="rgba(255,255,255,0.9)"/>
@@ -271,7 +271,7 @@ function animCircle() {
     </g>
     <!-- Cursor -->
     <g class="tut-cursor" opacity="0">
-      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.52;0.85;0.92"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.05;0.52;0.85;1"/>
       <animateTransform attributeName="transform" type="translate" values="155,78;165,80;165,80;220,78;220,78" dur="4.5s" repeatCount="indefinite" keyTimes="0;0.13;0.2;0.48;1"/>
       ${CURSOR}
     </g>
@@ -285,11 +285,11 @@ function animPipe() {
     <rect x="40" y="30" width="260" height="110" rx="2" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
     <!-- TW pipe (blue) -->
     <polyline points="60,130 60,60 160,60" fill="none" stroke="#1565C0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="180" stroke-dashoffset="180">
-      <animate attributeName="stroke-dashoffset" values="180;180;0;0;0;180" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.08;0.35;0.75;0.88;0.95"/>
+      <animate attributeName="stroke-dashoffset" values="180;180;0;0;0;180" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.08;0.35;0.75;0.92;1"/>
     </polyline>
     <!-- TW label -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.36;0.42;0.75;0.88"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.36;0.42;0.75;1"/>
       <rect x="82" y="47" width="24" height="13" rx="3" fill="#1565C0"/>
       <text x="94" y="57" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="monospace">TW</text>
       <rect x="87" y="63" width="40" height="12" rx="3" fill="rgba(255,255,255,0.9)"/>
@@ -297,11 +297,11 @@ function animPipe() {
     </g>
     <!-- AW pipe (brown) -->
     <polyline points="160,130 160,100 280,100" fill="none" stroke="#795548" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="150" stroke-dashoffset="150">
-      <animate attributeName="stroke-dashoffset" values="150;150;150;0;0;0;150" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.6;0.75;0.88;0.95"/>
+      <animate attributeName="stroke-dashoffset" values="150;150;150;0;0;0;150" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.35;0.4;0.6;0.75;0.92;1"/>
     </polyline>
     <!-- AW label -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.61;0.67;0.75;0.88"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.61;0.67;0.75;1"/>
       <rect x="200" y="87" width="24" height="13" rx="3" fill="#795548"/>
       <text x="212" y="97" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="monospace">AW</text>
       <rect x="195" y="103" width="40" height="12" rx="3" fill="rgba(255,255,255,0.9)"/>
@@ -309,7 +309,7 @@ function animPipe() {
     </g>
     <!-- Pipe type legend -->
     <g opacity="0">
-      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.42;0.5;0.75;0.88"/>
+      <animate attributeName="opacity" values="0;0;1;1;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.42;0.5;0.75;1"/>
       <rect x="240" y="37" width="22" height="11" rx="2.5" fill="#1565C0"/>
       <text x="251" y="46" text-anchor="middle" fill="#fff" font-size="7" font-weight="700" font-family="monospace">TW</text>
       <rect x="266" y="37" width="22" height="11" rx="2.5" fill="#795548"/>
@@ -321,7 +321,7 @@ function animPipe() {
     </g>
     <!-- Cursor -->
     <g class="tut-cursor" opacity="0">
-      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.03;0.65;0.8;0.88"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0.9;0" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.03;0.65;0.8;1"/>
       <animateTransform attributeName="transform" type="translate" values="55,125;55,125;55,55;55,55;155,55;155,55;155,125;155,125;155,95;155,95;275,95;275,95" dur="5.5s" repeatCount="indefinite" keyTimes="0;0.08;0.18;0.22;0.3;0.35;0.4;0.44;0.48;0.52;0.58;1"/>
       ${CURSOR}
     </g>
