@@ -2,7 +2,7 @@ import { state, PIPE_TYPES, nextMeasureId } from '../state.js';
 import { canvas } from '../canvas.js';
 import { saveSnapshot } from '../undo.js';
 import { showToast } from '../ui/modals.js';
-import { addEndpointDot, formatDistance } from '../utils/helpers.js';
+import { addEndpointDot, formatDistance, escHtml } from '../utils/helpers.js';
 import { callHook, TOOL_HINTS } from './tool-manager.js';
 import { _notifyBadge } from '../ui/statusbar.js';
 
@@ -427,7 +427,7 @@ export function updatePipePanel() {
           lenStr = formatDistance((px / state.imgDisplayScale) / state.scale);
         }
       }
-      const depthStr = m.pipeDepth ? ` · ${m.pipeDepth} cm` : '';
+      const depthStr = m.pipeDepth ? ` · ${escHtml(m.pipeDepth)} cm` : '';
       const availRefs = state.pipeReferences;
       const assignedRefs = m.refs || [];
 
@@ -446,7 +446,7 @@ export function updatePipePanel() {
             : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-1px"><polygon points="12 2 22 12 12 22 2 12"/></svg>';
           html += `<label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#374151;cursor:pointer;padding:1px 0;">
             <input type="checkbox" ${isAssigned ? 'checked' : ''} onchange="directToggleRef(${m.id}, ${ref.id}, this.checked)" style="margin:0;accent-color:#6366f1;" />
-            ${icon} <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ref.name}</span>
+            ${icon} <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(ref.name)}</span>
           </label>`;
         });
         html += `</div>`;

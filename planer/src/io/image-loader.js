@@ -7,6 +7,7 @@ import { updateMeasureButtons } from '../tools/tool-manager.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
 import { showTutorial } from '../onboarding/tutorial.js';
 import { showRefOnboarding } from '../onboarding/ref-onboarding.js';
+import { escHtml } from '../utils/helpers.js';
 
 // Absoluter Fehler in cm für eine Einzelmessung (Distanz in m).
 export async function readAndApplyExif(file, imgWidthPx) {
@@ -123,13 +124,13 @@ export async function readAndApplyExif(file, imgWidthPx) {
   ].filter(Boolean);
 
   let html = rows.map(([k,v]) =>
-    `<div class="meta-row"><span class="meta-key">${k}</span><span class="meta-val">${v}</span></div>`
+    `<div class="meta-row"><span class="meta-key">${escHtml(k)}</span><span class="meta-val">${escHtml(v)}</span></div>`
   ).join('');
 
   if (autoScale) {
     html += `<div class="meta-ok">Maßstab automatisch aus Bilddaten berechnet. Zur Überprüfung kann zusätzlich eine Referenzlinie gezeichnet werden.</div>`;
   }
-  warnings.forEach(w => { html += `<div class="meta-warn">${w}</div>`; });
+  warnings.forEach(w => { html += `<div class="meta-warn">${escHtml(w)}</div>`; });
 
   content.innerHTML = html;
   panel.style.display = '';

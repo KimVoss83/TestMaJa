@@ -1,6 +1,18 @@
 import { state, TOUCH_SCALE } from '../state.js';
 import { canvas } from '../canvas.js';
 
+// HTML-Escaping für alle Werte, die aus geladenen Dateien (Projekt-JSON,
+// Transfer-Dateien, EXIF-Metadaten, Dateinamen) in innerHTML fließen.
+// Verhindert XSS über manipulierte/geteilte Dateien.
+export function escHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Snap-to-Pixel: Rastet Koordinaten auf das nächste Original-Bildpixel ein,
 // damit Messungen wiederholbar und konsistent sind.
 export function snapToPixel(p) {

@@ -496,7 +496,6 @@ document.getElementById('btn-pipe-ref-line').onclick = () => {
   _dimToolBtn();
   document.getElementById('btn-pipe-ref-line').classList.add('active');
   document.getElementById('tt-helpers')?.classList.add('sub-active');
-  document.getElementById('tt-helpers')?.classList.remove('sub-active');
   document.getElementById('btn-pipe-ref-point').classList.remove('active');
   document.getElementById('status-hint').textContent = 'Startpunkt der Hilfslinie klicken …';
 };
@@ -515,7 +514,6 @@ document.getElementById('btn-pipe-ref-point').onclick = () => {
   _dimToolBtn();
   document.getElementById('btn-pipe-ref-point').classList.add('active');
   document.getElementById('tt-helpers')?.classList.add('sub-active');
-  document.getElementById('tt-helpers')?.classList.remove('sub-active');
   document.getElementById('btn-pipe-ref-line').classList.remove('active');
   document.getElementById('status-hint').textContent = 'Position des Hilfspunktes klicken …';
 };

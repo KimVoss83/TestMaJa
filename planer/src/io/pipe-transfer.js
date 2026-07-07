@@ -3,7 +3,7 @@ import { canvas } from '../canvas.js';
 import { showToast, createModal } from '../ui/modals.js';
 import { saveSnapshot } from '../undo.js';
 import { endPipeEdit, sendPipesToBack, offsetOverlappingPipes, PIPE_LINE_WIDTH } from '../tools/pipe.js';
-import { addEndpointDot, addLabel, addTickMarks, ptDist, formatDistance, formatArea, polygonArea } from '../utils/helpers.js';
+import { addEndpointDot, addLabel, addTickMarks, ptDist, formatDistance, formatArea, polygonArea, escHtml } from '../utils/helpers.js';
 import { clearPipeDistanceGuides, renderAllDimLines } from '../ui/pipe-guides.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
 import { updatePipeLegend } from '../ui/pipe-legend.js';
@@ -401,7 +401,7 @@ function _showAnchorImportStep() {
   const anchor = _anchorImport.anchors[idx];
   const total  = _anchorImport.anchors.length;
   _anchorBannerImport(
-    `Ankerpunkt ${idx + 1} von ${total}: Klicke auf <b>&bdquo;${anchor.name}&ldquo;</b> im neuen Luftbild`
+    `Ankerpunkt ${idx + 1} von ${total}: Klicke auf <b>&bdquo;${escHtml(anchor.name)}&ldquo;</b> im neuen Luftbild`
   );
 }
 
@@ -740,7 +740,7 @@ document.getElementById('leitungen-import-input').onchange = e => {
           <span style="display:block;margin:8px 0 0 0;line-height:1.9;">${data.anchors.map((a, i) =>
             `<span style="display:inline-flex;align-items:center;gap:5px;">
               <span style="background:#FF9500;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${i+1}</span>
-              ${a.name}
+              ${escHtml(a.name)}
             </span>`).join('<br>')}</span>
         </p>
         <div class="btn-row">

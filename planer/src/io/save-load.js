@@ -365,18 +365,23 @@ document.getElementById('json-input').onchange = e => {
       document.getElementById('font-size-input').value = state.fontSize;
       if (window._syncLabelBgBtn) window._syncLabelBgBtn(); // syncs btn-label-bg (set by initToolbar)
       canvas.loadFromJSON(data.canvas, () => {
-        canvas.renderAll();
-        // Remove any stale dim-line objects that were saved in the canvas JSON
-        canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
-        renderAllDimLines();
-        updateRefStatus();
-        updateMeasurementList();
-        updatePipeLegend();
-        updatePipeRefList();
-        offsetOverlappingPipes();
-        document.getElementById('drop-overlay').classList.add('hidden');
-        history.past = []; history.future = []; updateUndoRedoButtons();
-        showToast('Projekt geladen', 'success');
+        try {
+          canvas.renderAll();
+          // Remove any stale dim-line objects that were saved in the canvas JSON
+          canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
+          renderAllDimLines();
+          updateRefStatus();
+          updateMeasurementList();
+          updatePipeLegend();
+          updatePipeRefList();
+          offsetOverlappingPipes();
+          document.getElementById('drop-overlay').classList.add('hidden');
+          history.past = []; history.future = []; updateUndoRedoButtons();
+          showToast('Projekt geladen', 'success');
+        } catch (err) {
+          console.error('Laden fehlgeschlagen (Canvas-Callback):', err);
+          showToast('Fehler beim Laden der Datei.', 'error');
+        }
       });
     } catch { showToast('Fehler beim Laden der Datei.', 'error'); }
   };

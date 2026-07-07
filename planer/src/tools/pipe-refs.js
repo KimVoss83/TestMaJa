@@ -5,6 +5,7 @@ import { createModal, showToast } from '../ui/modals.js';
 import { _notifyBadge } from '../ui/statusbar.js';
 import { updatePipePanel, sendPipesToBack } from './pipe.js';
 import { callHook } from './tool-manager.js';
+import { escHtml } from '../utils/helpers.js';
 
 // =========================================================
 // PIPE REFERENCES — Grenzlinien & Referenzpunkte
@@ -197,7 +198,7 @@ export function updatePipeRefList() {
     const checked = state.activePipeRefs.includes(r.id) ? 'checked' : '';
     return `<div class="pipe-ref-item">
       <input type="checkbox" ${checked} onchange="togglePipeRef(${r.id}, this.checked)" />
-      <span class="ref-name">${icon} ${r.name}</span>
+      <span class="ref-name">${icon} ${escHtml(r.name)}</span>
       <button class="ref-delete" onclick="removePipeRef(${r.id})" title="Hilfslinie löschen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>`;
   }).join('');

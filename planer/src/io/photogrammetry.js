@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { formatErr } from '../utils/helpers.js';
+import { formatErr, escHtml } from '../utils/helpers.js';
 import { createModal } from '../ui/modals.js';
 
 // =========================================================
@@ -176,7 +176,7 @@ export function flightRecommendationTableHTML(sW_mm, f_mm, imgW_px, cameraName, 
   return `
     <div style="margin-top:10px;background:#f2f2f7;border-radius:10px;padding:10px 12px;">
       <div style="font-size:11px;font-weight:700;color:#1d1d1f;margin-bottom:6px;">
-        Flugempfehlung${cameraName ? ` · ${cameraName}` : ''} – max. Höhe für ±10 cm
+        Flugempfehlung${cameraName ? ` · ${escHtml(cameraName)}` : ''} – max. Höhe für ±10 cm
       </div>
       <table style="width:100%;border-collapse:collapse;">
         <thead>
