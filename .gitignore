@@ -1,0 +1,5 @@
+# macOS
+.DS_Store
+
+# Local tooling / superpowers scratch
+.superpowers/

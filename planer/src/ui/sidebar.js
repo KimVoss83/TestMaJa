@@ -4,6 +4,7 @@ import { saveSnapshot } from '../undo.js';
 import { _notifyBadge } from '../ui/statusbar.js';
 import { endPipeEdit, offsetOverlappingPipes, updatePipePanel } from '../tools/pipe.js';
 import { updatePipeLegend } from '../ui/pipe-legend.js';
+import { escHtml } from '../utils/helpers.js';
 
 // =========================================================
 // MEASUREMENT LIST
@@ -33,10 +34,10 @@ export function updateMeasurementList() {
     return `
     <div class="measurement-item">
       <div class="m-label">
-        <span>${TYPE_ICONS[m.type] || '•'} ${TYPE_LABELS[m.type] || m.type}</span>
+        <span>${TYPE_ICONS[m.type] || '•'} ${TYPE_LABELS[m.type] || escHtml(m.type)}</span>
         <span class="m-btns">${edgeToggle}<button class="m-calc" onclick="openMaterialCalc(${m.id})" title="Materialrechner"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg></button><button class="m-delete" onclick="removeMeasurement(${m.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></span>
       </div>
-      <div class="m-value">${m.label}</div>
+      <div class="m-value">${escHtml(m.label)}</div>
     </div>`;
   }).join('');
 }

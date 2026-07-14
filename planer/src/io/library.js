@@ -2,6 +2,7 @@ import { state } from '../state.js';
 import { canvas } from '../canvas.js';
 import { showToast } from '../ui/modals.js';
 import { setTool } from '../tools/tool-manager.js';
+import { escHtml } from '../utils/helpers.js';
 
 // =========================================================
 // LIBRARY — 2D-Skizzen Vogelperspektive
@@ -288,15 +289,20 @@ export function renderLibrary(activeCat) {
       grid.innerHTML = '<div style="font-size:10px;color:#9ca3af;padding:6px 0;">Noch keine eigenen Objekte.<br>Ordner verknüpfen oder Dateien hochladen.</div>';
     } else {
       grid.innerHTML = customLibItems.map(item =>
-        `<div class="lib-item custom-item" data-id="${item.id}" title="${item.name}">
-          <img src="${item.dataUrl}" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto;" />
-          <span>${item.name}</span>
-          <button class="custom-item-del" onclick="event.stopPropagation();deleteCustomLibItem('${item.id}')" title="Entfernen"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        `<div class="lib-item custom-item" data-id="${escHtml(item.id)}" title="${escHtml(item.name)}">
+          <img src="${escHtml(item.dataUrl)}" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto;" />
+          <span>${escHtml(item.name)}</span>
+          <button class="custom-item-del" title="Entfernen"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>`
       ).join('');
       grid.querySelectorAll('.custom-item').forEach(el => {
         const item = customLibItems.find(i => i.id === el.dataset.id);
-        if (item) el.onclick = () => placeCustomLibItem(item);
+        if (!item) return;
+        el.onclick = () => placeCustomLibItem(item);
+        el.querySelector('.custom-item-del').onclick = e => {
+          e.stopPropagation();
+          deleteCustomLibItem(item.id);
+        };
       });
     }
     return;
@@ -305,9 +311,9 @@ export function renderLibrary(activeCat) {
   // Built-in items
   const items = LIBRARY.filter(i => i.cat === activeCat);
   grid.innerHTML = items.map(item =>
-    `<div class="lib-item" data-idx="${LIBRARY.indexOf(item)}" title="${item.name.replace('\n',' ')}">
+    `<div class="lib-item" data-idx="${LIBRARY.indexOf(item)}" title="${escHtml(item.name.replace('\n',' '))}">
       ${item.svg.replace('<svg ', '<svg width="44" height="44" ')}
-      <span>${item.name}</span>
+      <span>${escHtml(item.name)}</span>
     </div>`
   ).join('');
   grid.querySelectorAll('.lib-item').forEach(el => {

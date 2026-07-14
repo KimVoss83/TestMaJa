@@ -8,13 +8,31 @@ PLACEHOLDER_RE = re.compile(r'<!-- RELEASE_NOTES_DATA:.*? -->')
 NEW_KEYWORDS     = ['add', 'neu', 'hinzugefügt', 'erstellt', 'feature']
 FIXED_KEYWORDS   = ['fix', 'bug', 'fehler', 'behoben', 'korrigiert']
 
+# Conventional-Commit-Prefixe haben Vorrang vor freier Schlüsselwortsuche,
+# damit z. B. "add fix for X" korrekt als "Neu" (feat/add) klassifiziert wird.
+NEW_PREFIXES   = ('feat', 'add', 'neu', 'feature')
+FIXED_PREFIXES = ('fix', 'bugfix', 'bug')
+
 def classify(msg):
-    m = msg.lower()
-    if any(re.search(kw, m) for kw in FIXED_KEYWORDS):
+    m = msg.lower().strip()
+    head_match = re.match(r'[a-zäöü]+', m)
+    head = head_match.group(0) if head_match else ''
+    if head in NEW_PREFIXES:
+        return 'Neu'
+    if head in FIXED_PREFIXES:
         return 'Behoben'
-    if any(re.search(kw, m) for kw in NEW_KEYWORDS):
+    # Fallback: Schlüsselwörter an Wortgrenzen (verhindert Treffer im Wortinneren)
+    if any(re.search(r'\b' + kw, m) for kw in FIXED_KEYWORDS):
+        return 'Behoben'
+    if any(re.search(r'\b' + kw, m) for kw in NEW_KEYWORDS):
         return 'Neu'
     return 'Geändert'
+
+def encode_for_comment(json_str):
+    """Kodiert '<' und '>' als \\uXXXX, damit die in einen HTML-Kommentar
+    eingebettete JSON-Zeichenkette den Kommentar nicht vorzeitig mit '-->'
+    beenden kann. JSON.parse dekodiert die Escapes wieder korrekt."""
+    return json_str.replace('<', '\\u003c').replace('>', '\\u003e')
 
 def get_commits():
     before = os.environ.get('BEFORE_SHA', '')
@@ -55,9 +73,11 @@ def main():
         'version': date.today().isoformat(),
         'entries': entries
     }
-    json_str = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+    json_str = encode_for_comment(json.dumps(data, separators=(',', ':'), ensure_ascii=False))
     new_comment = f'<!-- RELEASE_NOTES_DATA:{json_str} -->'
-    new_html = PLACEHOLDER_RE.sub(new_comment, html)
+    # Ersatz als Funktion übergeben, damit Backslashes in json_str nicht als
+    # Regex-Rückverweise (\1, \g<...>) interpretiert werden.
+    new_html = PLACEHOLDER_RE.sub(lambda _: new_comment, html)
 
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(new_html)
