@@ -77,14 +77,16 @@ git add wohnflaeche && git commit -m "feat(wohnflaeche): Scaffold als Kopie von 
 
 - [ ] **Step 1: Regressions-Smoke-Test schreiben (vor dem Strip)**
 
-`wohnflaeche/tests/smoke.spec.js` — prüft die Werkzeuge, die überleben müssen:
+**Wichtig:** `setupApp` liegt in einer eigenen Helper-Datei (KEINE .spec.js — sonst registriert Playwright die Tests doppelt, wenn andere Specs sie importieren).
+
+`wohnflaeche/tests/helpers.js`:
 
 ```js
-import { test, expect } from '@playwright/test';
+import { expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEMO = path.join(__dirname, '..', 'public', 'demo-plan.jpg');
+export const DEMO = path.join(__dirname, '..', 'public', 'demo-plan.jpg');
 
 // Hilfsfunktion: App laden, Onboarding weg, Maßstab programmatisch setzen (600px = 10m)
 export async function setupApp(page) {
@@ -108,6 +110,13 @@ export async function setupApp(page) {
   });
   return errors;
 }
+```
+
+`wohnflaeche/tests/smoke.spec.js`:
+
+```js
+import { test, expect } from '@playwright/test';
+import { setupApp } from './helpers.js';
 
 test('Kern-Werkzeuge funktionieren ohne Runtime-Fehler', async ({ page }) => {
   const errors = await setupApp(page);
@@ -443,7 +452,7 @@ git commit -m "feat(wohnflaeche): WoFlV-Rechenkern mit Unit-Tests"
 
 ```js
 import { test, expect } from '@playwright/test';
-import { setupApp } from './smoke.spec.js';
+import { setupApp } from './helpers.js';
 
 test('Raum zeichnen → state.rooms + korrektes Label', async ({ page }) => {
   await setupApp(page);
@@ -535,9 +544,19 @@ export function handleRoomClick(p, ev) {
   canvas.renderAll();
 }
 
+// Doppelklick feuert vorher 2× mouse:down → letzte Punkte können Duplikate sein.
+function dedupePoints(pts) {
+  const out = [];
+  for (const p of pts) {
+    const l = out[out.length - 1];
+    if (!l || Math.hypot(p.x - l.x, p.y - l.y) > 2) out.push(p);
+  }
+  return out;
+}
+
 export function handleRoomDblClick() {
-  if (state.roomDraft.length < 3) { cancelRoomDraft(); return; }
-  const polygon = state.roomDraft.slice();
+  const polygon = dedupePoints(state.roomDraft);
+  if (polygon.length < 3) { cancelRoomDraft(); return; }
   cancelRoomDraft();
   createModal('Raum anlegen', `
     <input type="text" id="room-name" placeholder="z.B. Wohnzimmer" />
@@ -666,7 +685,7 @@ git add -A wohnflaeche && git commit -m "feat(wohnflaeche): Raum-Werkzeug mit 90
 
 ```js
 import { test, expect } from '@playwright/test';
-import { setupApp } from './smoke.spec.js';
+import { setupApp } from './helpers.js';
 
 async function addRoomsProgrammatically(page) {
   await page.evaluate(async () => {
@@ -843,7 +862,7 @@ git add -A wohnflaeche && git commit -m "feat(wohnflaeche): Raumliste mit WoFlV-
 
 ```js
 import { test, expect } from '@playwright/test';
-import { setupApp } from './smoke.spec.js';
+import { setupApp } from './helpers.js';
 
 test('50%-Zone im Raum reduziert die Summe; Mini-Abzug wird ignoriert', async ({ page }) => {
   await setupApp(page);
@@ -916,9 +935,19 @@ export function handleZoneClick(p, mode) {
   canvas.renderAll();
 }
 
+// Doppelklick feuert vorher 2× mouse:down → letzte Punkte deduplizieren
+function dedupePoints(pts) {
+  const out = [];
+  for (const p of pts) {
+    const l = out[out.length - 1];
+    if (!l || Math.hypot(p.x - l.x, p.y - l.y) > 2) out.push(p);
+  }
+  return out;
+}
+
 export function handleZoneDblClick(mode) {
-  if (_draft.length < 3 || !_targetRoom) { cancelZoneDraft(); return; }
-  const polygon = _draft.slice();
+  const polygon = dedupePoints(_draft);
+  if (polygon.length < 3 || !_targetRoom) { cancelZoneDraft(); return; }
   const room = _targetRoom;
   cancelZoneDraft();
   if (mode === 'zone') {
@@ -1270,7 +1299,7 @@ git add -A wohnflaeche && git commit -m "feat(wohnflaeche): Kalibrierungs-Onboar
 
 ```js
 import { test, expect } from '@playwright/test';
-import { setupApp } from './smoke.spec.js';
+import { setupApp } from './helpers.js';
 
 async function seedRooms(page) {
   await page.evaluate(async () => {
@@ -1338,7 +1367,7 @@ export function buildCSV(rooms, scale) {
 }
 
 export function exportCSV() {
-  const blob = new Blob(['﻿' + buildCSV(state.rooms, state.scale)],
+  const blob = new Blob(['\uFEFF' + buildCSV(state.rooms, state.scale)],  // BOM für Excel-Umlaute
     { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1431,7 +1460,7 @@ git add -A wohnflaeche && git commit -m "feat(wohnflaeche): PDF-Bericht und CSV-
 
 ```js
 import { test, expect } from '@playwright/test';
-import { setupApp } from './smoke.spec.js';
+import { setupApp } from './helpers.js';
 
 test('Räume überleben Speichern → Laden (Round-Trip)', async ({ page }) => {
   await setupApp(page);
