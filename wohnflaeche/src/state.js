@@ -9,7 +9,7 @@ export const state = {
   lineWidth: 1,
   labelBg: true,            // true = weißer Hintergrund / schwarze Schrift
   scale: null,              // original-px per meter
-  scaleSource: null,        // 'exif' | 'form' | 'ref'
+  scaleSource: null,        // 'ref' | 'pdf'
   exifAltitude: null,       // Flughöhe in m (für EXIF/form-Genauigkeit)
   imgDisplayScale: 1,       // canvas-px pro original-px (Fit-Skalierung beim Laden)
   refLines: [],             // [{pxLen, realLen_m}] — alle Referenzlinien (KQ-Ausgleich)

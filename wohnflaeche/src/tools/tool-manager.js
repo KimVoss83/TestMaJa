@@ -107,12 +107,6 @@ export function setTool(t) {
   document.getElementById('status-hint').textContent = TOOL_HINTS[t];
   const HELPER_TOOLS = ['distance', 'area'];
   document.getElementById('draw-helpers-group').style.display = HELPER_TOOLS.includes(t) ? '' : 'none';
-  // Mobile helpers bar — hide when switching to a non-helper-compatible tool
-  const mhb = document.getElementById('mobile-helpers-bar');
-  if (mhb) {
-    const HELPER_PARENT_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc'];
-    if (!HELPER_PARENT_TOOLS.includes(t)) mhb.classList.remove('visible');
-  }
   // Sections stay collapsed — notification badges show new items
 }
 
