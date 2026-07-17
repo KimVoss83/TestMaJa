@@ -31,11 +31,11 @@ export function intersectionArea(polyA, polyB) {
   const xs = polyA.map(p => p.x), ys = polyA.map(p => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const step = Math.max(maxX - minX, maxY - minY) / 300;
-  if (!(step > 0)) return 0;
+  const stepX = (maxX - minX) / 300, stepY = (maxY - minY) / 300;
+  if (!(stepX > 0) || !(stepY > 0)) return 0;
   let hits = 0, total = 0;
-  for (let x = minX + step / 2; x < maxX; x += step)
-    for (let y = minY + step / 2; y < maxY; y += step) {
+  for (let x = minX + stepX / 2; x < maxX; x += stepX)
+    for (let y = minY + stepY / 2; y < maxY; y += stepY) {
       const p = { x, y };
       if (pointInPolygon(p, polyA)) { total++; if (pointInPolygon(p, polyB)) hits++; }
     }
@@ -48,13 +48,15 @@ export function roomCalc(room, scale) {
 
   const abzuege = (room.deductions || []).map(d =>
     ({ ...d, area_m2: px2m2(intersectionArea(d.polygon, room.polygon)) }));
-  const abzugSum = abzuege.filter(d => d.area_m2 > MIN_ABZUG_M2)
-                          .reduce((s, d) => s + d.area_m2, 0);
+  const counted = abzuege.filter(d => d.area_m2 > MIN_ABZUG_M2);
+  const abzugSum = counted.reduce((s, d) => s + d.area_m2, 0);
   const basis = Math.max(0, roh - abzugSum);
 
   let zone50 = 0, zone0 = 0;
   for (const z of room.zones || []) {
-    const a = px2m2(intersectionArea(z.polygon, room.polygon));
+    let a = px2m2(intersectionArea(z.polygon, room.polygon));
+    for (const d of counted) a -= px2m2(intersectionArea(z.polygon, d.polygon));
+    a = Math.max(0, a);
     if (z.height === '1bis2m') zone50 += a; else zone0 += a;
   }
   zone50 = Math.min(zone50, basis);

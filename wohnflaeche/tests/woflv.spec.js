@@ -74,3 +74,36 @@ test('scaleFromPrintScale: A4 quer 1:100', async ({ page }) => {
   // A4-Breite 595,28 pt = 0,20999 m Papier → bei 1:100 = 20,999 m real; 2380 px gerendert
   expect(await c('scaleFromPrintScale', 100, 595.28, 2380)).toBeCloseTo(113.34, 1);
 });
+
+test('Zone überlappt Abzug: Überlappung wird nicht doppelt gezählt', async ({ page }) => {
+  const c = await calc(page);
+  // Abzug 100×200 px = 2 m², liegt vollständig innerhalb der 0%-Zone 150×300 px = 4,5 m²
+  const deduction = [{x:0,y:0},{x:100,y:0},{x:100,y:200},{x:0,y:200}];
+  const zone = [{x:0,y:0},{x:150,y:0},{x:150,y:300},{x:0,y:300}];
+  const r = await c('roomCalc', room({
+    deductions: [{ polygon: deduction, label: 'd' }],
+    zones: [{ polygon: zone, height: 'unter1m' }],
+  }), 100);
+  expect(r.abzugSum).toBeCloseTo(2, 1);
+  expect(r.zone0).toBeCloseTo(2.5, 1);        // 4,5 − 2 (Überlappung mit Abzug)
+  expect(r.anrechenbar).toBeCloseTo(7.5, 1);  // (12 − 2) − 2,5
+});
+
+test('intersectionArea: anisotropes Sampling bei schmalem Streifen', async ({ page }) => {
+  const c = await calc(page);
+  // Dünner Streifen 400×10 px, vollständig im Raum → exakt 4000 px² (shoelace)
+  const strip = [{x:0,y:0},{x:400,y:0},{x:400,y:10},{x:0,y:10}];
+  const area = await c('intersectionArea', strip, RECT);
+  expect(area).toBeGreaterThan(3960);
+  expect(area).toBeLessThan(4040);
+});
+
+test('Faktoren: Wintergarten/Schwimmbad 0,5 und Balkon-Default ohne balkonFaktor', async ({ page }) => {
+  const c = await calc(page);
+  const w = await c('roomCalc', room({ category: 'wintergarten-unbeh' }), 100);
+  expect(w.anrechenbar).toBeCloseTo(6, 5);   // 12 · 0,5
+  const s = await c('roomCalc', room({ category: 'schwimmbad' }), 100);
+  expect(s.anrechenbar).toBeCloseTo(6, 5);   // 12 · 0,5
+  const b = await c('roomCalc', room({ category: 'balkon', balkonFaktor: undefined }), 100);
+  expect(b.anrechenbar).toBeCloseTo(3, 5);   // Default 0,25 greift
+});
