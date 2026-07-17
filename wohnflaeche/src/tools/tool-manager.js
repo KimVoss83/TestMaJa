@@ -1,4 +1,4 @@
-import { state, PIPE_TYPES, _isTouchDevice } from '../state.js';
+import { state, _isTouchDevice } from '../state.js';
 import { canvas } from '../canvas.js';
 import { showToast } from '../ui/modals.js';
 
@@ -8,7 +8,6 @@ import { showToast } from '../ui/modals.js';
 export const TOOL_NAMES = {
   select: 'Auswahl', ref: 'Maßstab', distance: 'Distanz',
   area: 'Fläche', circle: 'Kreis', arc: 'Kreisabschnitt', label: 'Label',
-  pipe: 'Leitung'
 };
 export const TOOL_HINTS = {
   select: '',
@@ -18,7 +17,6 @@ export const TOOL_HINTS = {
   circle: 'Mittelpunkt klicken …',
   arc: 'Mittelpunkt klicken …',
   label: 'Klicken = neues Label · Doppelklick = bearbeiten',
-  pipe: 'Punkte klicken → Doppelklick zum Abschluss',
 };
 export const MEASURE_TOOLS = ['distance', 'area', 'circle', 'arc'];
 
@@ -67,7 +65,7 @@ export function updateMeasureButtons() {
 }
 
 // Mobile onboarding trigger
-const _MOB_OB_TOOLS = ['ref','distance','area','circle','arc','pipe'];
+const _MOB_OB_TOOLS = ['ref','distance','area','circle','arc'];
 export function _tryMobileOnboarding(t) {
   if (!_MOB_OB_TOOLS.includes(t)) return;
   const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -98,29 +96,23 @@ export function setTool(t) {
   if (t === 'select') _loupeHide();
   _mobileMagHide();
   canvas.forEachObject(o => {
-    o.selectable = (t === 'select' && !o._noSelect) || !!o._isPipeLegend || (t === 'label' && !!o._userLabel);
+    o.selectable = (t === 'select' && !o._noSelect) || (t === 'label' && !!o._userLabel);
     o.evented = o.selectable;
-    // Lock movement for measurements, ref lines, pipes, guides — but NOT for labels, lib items, dim foot handles
-    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib || !!o._dimDraggableFoot;
+    // Lock movement for measurements, ref lines, guides — but NOT for labels, lib items
+    const isMovable = !!o._userLabel || !!o._libItem || !!o._customLib;
     o.lockMovementX = !isMovable;
     o.lockMovementY = !isMovable;
   });
   document.getElementById('status-tool').textContent = 'Werkzeug: ' + TOOL_NAMES[t];
   document.getElementById('status-hint').textContent = TOOL_HINTS[t];
-  document.getElementById('pipe-type-group').style.display = (t === 'pipe') ? '' : 'none';
-  const HELPER_TOOLS = ['distance', 'area', 'pipe'];
+  const HELPER_TOOLS = ['distance', 'area'];
   document.getElementById('draw-helpers-group').style.display = HELPER_TOOLS.includes(t) ? '' : 'none';
-  // Mobile pipe bar
-  const mpb = document.getElementById('mobile-pipe-bar');
-  if (mpb) mpb.classList.toggle('visible', t === 'pipe');
   // Mobile helpers bar — hide when switching to a non-helper-compatible tool
   const mhb = document.getElementById('mobile-helpers-bar');
   if (mhb) {
-    const HELPER_PARENT_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
+    const HELPER_PARENT_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc'];
     if (!HELPER_PARENT_TOOLS.includes(t)) mhb.classList.remove('visible');
   }
-  const REF_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
-  if (!REF_TOOLS.includes(t)) { state.pipeRefMode = null; state.pipeRefTempPt = null; }
   // Sections stay collapsed — notification badges show new items
 }
 
@@ -133,42 +125,6 @@ export function initToolbar() {
     const btn = document.getElementById('btn-' + id);
     if (btn) btn.onclick = () => setTool(id);
   });
-
-  // Pipe type select
-  (function initPipeSelect() {
-    const sel = document.getElementById('pipe-type-select');
-    const MAIN_PIPE_KEYS = ['TW','AW','RW','GB','G','St','GF','Cu','LR'];
-    MAIN_PIPE_KEYS.forEach(key => {
-      const pt = PIPE_TYPES[key];
-      const opt = document.createElement('option');
-      opt.value = key; opt.textContent = `● ${pt.label}`; opt.style.color = pt.color;
-      sel.appendChild(opt);
-    });
-    sel.value = state.pipeType;
-    sel.onchange = () => { state.pipeType = sel.value; };
-  })();
-
-  // Mobile pipe type bar
-  (function initMobilePipeBar() {
-    const bar = document.getElementById('mobile-pipe-bar');
-    if (!bar) return;
-    const MAIN_PIPE_KEYS = ['TW','AW','RW','GB','G','St','GF','Cu','LR'];
-    MAIN_PIPE_KEYS.forEach(key => {
-      const pt = PIPE_TYPES[key];
-      const chip = document.createElement('button');
-      chip.className = 'mp-chip';
-      chip.dataset.key = key;
-      chip.innerHTML = `<span class="mp-dot" style="background:${pt.color}"></span>${pt.label}`;
-      if (key === state.pipeType) chip.classList.add('active');
-      chip.onclick = () => {
-        state.pipeType = key;
-        document.getElementById('pipe-type-select').value = key;
-        bar.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-      };
-      bar.appendChild(chip);
-    });
-  })();
 
   // Line width picker
   document.querySelectorAll('.lw-dot').forEach(dot => {

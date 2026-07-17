@@ -56,47 +56,13 @@ export function initBottomToolbar({ openDrawer }) {
 
   const _ttToolMap = {
     'tt-select': 'select', 'tt-ref': 'ref', 'tt-distance': 'distance',
-    'tt-area': 'area', 'tt-circle': 'circle', 'tt-pipe': 'pipe',
+    'tt-area': 'area', 'tt-circle': 'circle',
   };
   Object.entries(_ttToolMap).forEach(([btnId, tool]) => {
     const btn = document.getElementById(btnId);
     if (btn) btn.onclick = () => setTool(tool);
   });
   document.getElementById('tt-undo').onclick = () => undo();
-
-  // ── Mobile Helpers Bar (Hilfselemente) ──
-  let _activeHelper = 'pipe-ref-line'; // default
-  const _helpersBar = document.getElementById('mobile-helpers-bar');
-  const HELPER_ITEMS = [
-    { id: 'pipe-ref-line', label: 'Hilfslinie', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" stroke-dasharray="4 2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>' },
-    { id: 'pipe-ref-point', label: 'Hilfspunkt', icon: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>' },
-  ];
-  if (_helpersBar) {
-    HELPER_ITEMS.forEach(h => {
-      const chip = document.createElement('button');
-      chip.className = 'mp-chip';
-      chip.dataset.helper = h.id;
-      chip.innerHTML = h.icon + ' ' + h.label;
-      if (h.id === _activeHelper) chip.classList.add('active');
-      chip.onclick = () => {
-        _activeHelper = h.id;
-        _helpersBar.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        document.getElementById('btn-' + h.id).click();
-      };
-      _helpersBar.appendChild(chip);
-    });
-  }
-  document.getElementById('tt-helpers').onclick = () => {
-    const bar = document.getElementById('mobile-helpers-bar');
-    if (bar.classList.contains('visible')) {
-      // Already open — activate the current helper
-      document.getElementById('btn-' + _activeHelper).click();
-    } else {
-      bar.classList.add('visible');
-      document.getElementById('btn-' + _activeHelper).click();
-    }
-  };
 
   // ── Mobile Drei-Punkte-Menü ──
   const _mmMenu = document.getElementById('mobile-menu');

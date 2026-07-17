@@ -1,7 +1,7 @@
 // =========================================================
 // NOTIFICATION BADGES
 // =========================================================
-export const _prevCounts = { messungen: 0, leitungen: 0, hilfslinien: 0 };
+export const _prevCounts = { messungen: 0 };
 export function _notifyBadge(badgeId, sectionId, newCount, key) {
   if (newCount > _prevCounts[key]) {
     const sec = document.getElementById(sectionId);

@@ -4,14 +4,11 @@ import { snapToPixel, ptDist, formatDistance } from '../utils/helpers.js';
 import { throttledRender } from '../utils/loupe.js';
 import * as _loupe from '../utils/loupe.js';
 import { haptic } from '../ui/modals.js';
-import { showPipeDistanceGuides } from '../ui/pipe-guides.js';
 import { handleRefClick } from '../tools/ref.js';
 import { handleDistanceClick } from '../tools/distance.js';
 import { handleAreaClick, updatePreviewPolygon, finishArea } from '../tools/area.js';
 import { handleCircleClick, updatePreviewCircle, finishCircle } from '../tools/circle.js';
 import { handleArcClick, updatePreviewArc, finishArc } from '../tools/arc.js';
-import { handlePipeClick, updatePreviewPipe, finishPipe } from '../tools/pipe.js';
-import { handlePipeRefClick } from '../tools/pipe-refs.js';
 import { updateLiveLabel } from '../tools/label.js';
 
 // =========================================================
@@ -110,13 +107,11 @@ function _hideMobileCrosshair() {
 }
 
 // =========================================================
-// MOBILE FINISH BUTTON: für Fläche/Leitung (Multi-Punkt)
+// MOBILE FINISH BUTTON: für Fläche (Multi-Punkt)
 // =========================================================
 function _updateFinishBtn() {
   if (!_isTouchDevice) return;
-  const showFinish =
-    (state.tool === 'area' && state.areaPoints.length >= 3) ||
-    (state.tool === 'pipe' && state.pipePoints.length >= 2);
+  const showFinish = state.tool === 'area' && state.areaPoints.length >= 3;
   if (showFinish) {
     _finishBtn.classList.add('visible');
   } else {
@@ -158,10 +153,6 @@ function _updateMobileMagnifiers(p) {
     const lastPt = state.areaPoints[state.areaPoints.length - 1];
     _mobileMag.updateStart(lastPt.x, lastPt.y, col);
     hasStart = true;
-  } else if (state.tool === 'pipe' && state.pipePoints.length >= 1) {
-    const lastPt = state.pipePoints[state.pipePoints.length - 1];
-    _mobileMag.updateStart(lastPt.x, lastPt.y, col);
-    hasStart = true;
   }
   if (hasStart) {
     // Zweiter Punkt: A zeigt Startpunkt (oben gesetzt), B zeigt Fingerposition
@@ -174,7 +165,7 @@ function _updateMobileMagnifiers(p) {
 }
 
 export function initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust }) {
-  const DRAWING_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc', 'pipe'];
+  const DRAWING_TOOLS = ['ref', 'distance', 'area', 'circle', 'arc'];
 
   if (_isTouchDevice) {
     // Lupe auf Touch-Geräten deaktivieren (Desktop-Lupe nicht nötig)
@@ -184,8 +175,6 @@ export function initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust }) {
     _finishBtn.addEventListener('click', () => {
       if (state.tool === 'area' && state.areaPoints.length >= 3) {
         finishArea();
-      } else if (state.tool === 'pipe' && state.pipePoints.length >= 2) {
-        finishPipe();
       }
       _finishBtn.classList.remove('visible');
       _mobileMag.hide();
@@ -260,12 +249,6 @@ export function initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust }) {
       if (state.tool === 'arc' && state.arcStep >= 1) {
         updatePreviewArc(snapped);
       }
-      if (state.tool === 'pipe' && state.pipePoints.length > 0) {
-        updatePreviewPipe([...state.pipePoints, snapped]);
-      }
-      if (DRAWING_TOOLS.includes(state.tool) && !state.pipeRefMode) {
-        showPipeDistanceGuides(snapped);
-      }
 
       // Magnifier updaten
       _updateMobileMagnifiers(snapped);
@@ -289,19 +272,12 @@ export function initTouchHandlers({ _touchSuppressClickRef, _mobileAdjust }) {
       const snapped = snapToPixel(p);
 
       // Punkt an Tool-Handler übergeben
-      // Prüfe zuerst Referenz-Erstellung
-      if (DRAWING_TOOLS.includes(state.tool) && handlePipeRefClick(snapped)) {
-        _mobileMag.hide();
-        return;
-      }
-
       switch (state.tool) {
         case 'ref':      handleRefClick(snapped); break;
         case 'distance': handleDistanceClick(snapped); break;
         case 'area':     handleAreaClick(snapped); break;
         case 'circle':   handleCircleClick(snapped); break;
         case 'arc':      handleArcClick(snapped); break;
-        case 'pipe':     handlePipeClick(snapped); break;
       }
 
       // Finish-Button für Multi-Punkt-Tools aktualisieren

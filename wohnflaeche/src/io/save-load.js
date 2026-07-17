@@ -1,14 +1,9 @@
-import { state, CANVAS_SERIAL_PROPS, PIPE_TYPES } from '../state.js';
+import { state, CANVAS_SERIAL_PROPS } from '../state.js';
 import { canvas } from '../canvas.js';
 import { showToast, createModal } from '../ui/modals.js';
 import { history, saveSnapshot, updateUndoRedoButtons } from '../undo.js';
-import { endPipeEdit, offsetOverlappingPipes } from '../tools/pipe.js';
-import { clearPipeDistanceGuides, renderAllDimLines } from '../ui/pipe-guides.js';
 import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
-import { updatePipeLegend } from '../ui/pipe-legend.js';
-import { updatePipeRefList, setPipeRefId } from '../tools/pipe-refs.js';
-import { calcAccuracy } from './photogrammetry.js';
 
 // SAVE / LOAD  (Zentrales Modal)
 // =========================================================
@@ -29,8 +24,7 @@ export function openSaveModal() {
       <h2>Speichern</h2>
       <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du speichern?</p>
       <div id="sl-step1" style="display:flex;flex-direction:column;gap:6px;">
-        ${_saveOptionHTML('save-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>', 'Gesamtes Projekt', 'Alle Messungen, Leitungen, Einstellungen')}
-        ${_saveOptionHTML('save-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Messungen transferieren', 'Alle Messungen & Leitungen mit Ankerpunkten für neues Bild')}
+        ${_saveOptionHTML('save-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>', 'Gesamtes Projekt', 'Alle Messungen, Einstellungen')}
       </div>
       <div id="sl-step2" style="display:none;">
         <p style="margin:0 0 10px;color:#888;font-size:12px;">In welchem Format?</p>
@@ -54,10 +48,7 @@ export function openSaveModal() {
   overlay.querySelectorAll('#sl-step1 .save-load-option').forEach(opt => {
     opt.onclick = () => {
       const action = opt.dataset.action;
-      if (action === 'save-pipes') {
-        close();
-        if (window.exportLeitungen) window.exportLeitungen();
-      } else if (action === 'save-project') {
+      if (action === 'save-project') {
         overlay.querySelector('#sl-step1').style.display = 'none';
         overlay.querySelector('#sl-step2').style.display = '';
         overlay.querySelector('#sl-back').style.display = '';
@@ -100,7 +91,6 @@ export function openLoadModal() {
       <p style="margin:0 0 10px;color:#888;font-size:12px;">Was möchtest du laden?</p>
       <div style="display:flex;flex-direction:column;gap:6px;">
         ${_saveOptionHTML('load-project', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', 'Projekt laden (.json)', 'Gespeichertes Projekt öffnen und weiterarbeiten')}
-        ${_saveOptionHTML('load-pipes', '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', 'Messungen einmessen', 'Gespeicherte Messungen in neues Bild übertragen')}
       </div>
       <div class="btn-row" style="margin-top:12px;">
         <button id="sl-close">Abbrechen</button>
@@ -116,7 +106,6 @@ export function openLoadModal() {
       close();
       const action = opt.dataset.action;
       if (action === 'load-project') document.getElementById('json-input').click();
-      else if (action === 'load-pipes') document.getElementById('leitungen-import-input').click();
     };
   });
 
@@ -129,7 +118,6 @@ document.getElementById('btn-central-load').onclick = openLoadModal;
 // ─── Einzelne Speicherfunktionen (vom Modal aufgerufen) ───
 
 export function doSavePNG() {
-  endPipeEdit(); clearPipeDistanceGuides();
   const url = canvas.toDataURL({ format: 'png', multiplier: 3 });
 
   // Data-URL → Blob konvertieren
@@ -161,7 +149,6 @@ export function doSavePNG() {
 document.getElementById('btn-save-png').onclick = doSavePNG;
 
 export function doSavePDF() {
-  endPipeEdit(); clearPipeDistanceGuides();
   if (!state.backgroundImage) { showToast('Bitte zuerst ein Luftbild laden.'); return; }
   const canvasW = canvas.width;
   const canvasH = canvas.height;
@@ -236,29 +223,6 @@ export function doSavePDF() {
     pdf.text('Maßstabsbalken', bx, by + 6);
   }
 
-  // ── Legende (Leitungstypen) ──
-  const pipeTypes = [...new Set(
-    canvas.getObjects().filter(o => o._pipeType).map(o => o._pipeType)
-  )];
-  if (pipeTypes.length) {
-    let lx = offsetX + 45;
-    const ly = footerY + 1;
-    pdf.setFontSize(6); pdf.setTextColor(80);
-    pdf.text('Leitungen:', lx, ly + 3);
-    lx += 18;
-    pipeTypes.forEach(key => {
-      const pt = PIPE_TYPES[key];
-      if (!pt) return;
-      const [r, g, b] = pt.color.match(/\w\w/g).map(x => parseInt(x, 16));
-      pdf.setFillColor(r, g, b);
-      pdf.setDrawColor(r, g, b);
-      pdf.rect(lx, ly + 1, 8, 2, 'F');
-      pdf.setTextColor(40); pdf.setFontSize(6);
-      pdf.text(`${pt.icon} ${pt.label}`, lx + 10, ly + 3.5);
-      lx += 10 + pdf.getTextWidth(`${pt.icon} ${pt.label}`) + 4;
-    });
-  }
-
   // ── Titelblock rechts ──
   const dateStr = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
   pdf.setFontSize(7); pdf.setTextColor(80);
@@ -266,11 +230,9 @@ export function doSavePDF() {
   pdf.setFontSize(6); pdf.setTextColor(130);
   pdf.text(`Exportiert: ${dateStr}`, pageW - margin, footerY + 7, { align: 'right' });
   if (state.scale && state.imgDisplayScale) {
-    const acc = calcAccuracy();
-    if (acc) {
-      const gsd = acc.gsd_cm < 1 ? `${(acc.gsd_cm*10).toFixed(1)} mm/px` : `${acc.gsd_cm.toFixed(1)} cm/px`;
-      pdf.text(`GSD: ${gsd}`, pageW - margin, footerY + 11, { align: 'right' });
-    }
+    const cmPerPx = 100 / state.scale;
+    const gsd = cmPerPx < 1 ? `${(cmPerPx*10).toFixed(1)} mm/px` : `${cmPerPx.toFixed(1)} cm/px`;
+    pdf.text(`Maßstab: ${gsd}`, pageW - margin, footerY + 11, { align: 'right' });
   }
 
   // iOS/Mobile: Share Sheet wenn verfügbar
@@ -289,8 +251,6 @@ document.getElementById('btn-save-pdf').onclick = doSavePDF;
 
 export function doSaveProjectJSON() {
   try {
-    endPipeEdit();
-    clearPipeDistanceGuides();
     const data = {
       version: 3,
       scale: state.scale,
@@ -300,15 +260,12 @@ export function doSaveProjectJSON() {
       refLines: state.refLines,
       refSumL2: state.refSumL2,
       imgOriginalWidth: state.imgOriginalWidth,
-      flightCam: state.flightCam || null,
       fontSize: state.fontSize,
       labelBg: state.labelBg,
       gridStepM: state.gridStepM || 0,
       gridColor: state.gridColor || '#ffffff',
       gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
-      measurements: state.measurements.map(({ id, type, label, value, rMeters, pipeType, pipeDepth, refs, nennweite, dimFootOverrides }) => ({ id, type, label, value, rMeters, pipeType, pipeDepth, refs: refs || [], nennweite: nennweite || null, dimFootOverrides: dimFootOverrides || {} })),
-      pipeReferences: state.pipeReferences,
-      activePipeRefs: state.activePipeRefs,
+      measurements: state.measurements.map(({ id, type, label, value, rMeters }) => ({ id, type, label, value, rMeters })),
       canvas: canvas.toJSON(CANVAS_SERIAL_PROPS),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -347,7 +304,6 @@ document.getElementById('json-input').onchange = e => {
       state.refLines        = Array.isArray(data.refLines) ? data.refLines : [];
       state.refSumL2        = (typeof data.refSumL2 === 'number') ? data.refSumL2 : 0;
       state.imgOriginalWidth = data.imgOriginalWidth || null;
-      state.flightCam       = data.flightCam || null;
       state.fontSize = (Number.isInteger(data.fontSize) && data.fontSize >= 6 && data.fontSize <= 72) ? data.fontSize : 13;
       state.labelBg  = data.labelBg === true;
       state.gridStepM  = (typeof data.gridStepM === 'number') ? data.gridStepM : 0;
@@ -359,22 +315,13 @@ document.getElementById('json-input').onchange = e => {
       const _gor = document.getElementById('grid-opacity-range'); if (_gor) _gor.value = Math.round(state.gridOpacity * 100);
       const _gol = document.getElementById('grid-opacity-label'); if (_gol) _gol.textContent = Math.round(state.gridOpacity * 100) + '%';
       state.measurements = (data.measurements || []).map(m => ({ ...m }));
-      state.pipeReferences = Array.isArray(data.pipeReferences) ? data.pipeReferences : [];
-      state.activePipeRefs = Array.isArray(data.activePipeRefs) ? data.activePipeRefs : [];
-      setPipeRefId(state.pipeReferences.reduce((max, r) => Math.max(max, r.id), 0));
       document.getElementById('font-size-input').value = state.fontSize;
       if (window._syncLabelBgBtn) window._syncLabelBgBtn(); // syncs btn-label-bg (set by initToolbar)
       canvas.loadFromJSON(data.canvas, () => {
         try {
           canvas.renderAll();
-          // Remove any stale dim-line objects that were saved in the canvas JSON
-          canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
-          renderAllDimLines();
           updateRefStatus();
           updateMeasurementList();
-          updatePipeLegend();
-          updatePipeRefList();
-          offsetOverlappingPipes();
           document.getElementById('drop-overlay').classList.add('hidden');
           history.past = []; history.future = []; updateUndoRedoButtons();
           showToast('Projekt geladen', 'success');

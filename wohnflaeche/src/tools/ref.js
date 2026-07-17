@@ -4,7 +4,6 @@ import { saveSnapshot } from '../undo.js';
 import { addLabel, addEndpointDot, addRefEndmarks, formatDistance, ptDist, snapToPixel } from '../utils/helpers.js';
 import { createModal } from '../ui/modals.js';
 import { TOOL_HINTS, updateMeasureButtons } from './tool-manager.js';
-import { calcAccuracy, calcFlightRecommendation, flightRecommendationTableHTML, showAccuracyDetail, hideAccuracyDetail, distErr_m } from '../io/photogrammetry.js';
 
 // =========================================================
 // REFERENCE TOOL
@@ -123,32 +122,19 @@ export function promptReference(pxLen) {
 export function updateRefStatus() {
   const statusRef = document.getElementById('status-ref');
   const refStatus = document.getElementById('ref-status');
-
   if (state.scale) {
-    const acc = calcAccuracy();
-    const gsdStr = acc.gsd_cm < 1
-      ? `${(acc.gsd_cm * 10).toFixed(2)} mm/px`
-      : `${acc.gsd_cm.toFixed(2)} cm/px`;
-    const err = acc.err100m_cm;
-    const errStr = err < 100 ? `±${err.toFixed(1)} cm` : `±${(err / 100).toFixed(2)} m`;
+    const cmPerPx = 100 / state.scale;
     const n = state.refLines.length;
-    const sourceLabel = state.scaleSource === 'ref'
-      ? `${n} Ref${n > 1 ? 'erenzen' : 'erenz'}`
-      : { exif: 'EXIF', form: 'Kameradaten' }[state.scaleSource] || '';
-
-    // Farbcode für den Fehler
-    const errColor = err <= 10 ? '#34c759' : err <= 20 ? '#ff9500' : '#ff3b30';
-
+    const sourceLabel = state.scaleSource === 'pdf'
+      ? `Maßstab 1:${state.printScale}`
+      : `${n} Ref${n > 1 ? 'erenzen' : 'erenz'}`;
     refStatus.innerHTML =
-      `<div class="ref-status-row">` +
-        `<div class="ref-status-main">` +
-          `<span class="ref-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg> ${sourceLabel}</span>` +
-          `<span class="ref-metrics">GSD <b>${gsdStr}</b> &nbsp;·&nbsp; <b style="color:${errColor}">${errStr}</b> bei 100 m</span>` +
-        `</div>` +
-        `<button class="ref-detail-btn" onclick="showAccuracyDetail()" title="Genauigkeits-Details"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>` +
-      `</div>`;
-
-    statusRef.innerHTML = `GSD: <b style="color:#1d1d1f">${gsdStr}</b> &nbsp;·&nbsp; <b style="color:${errColor}">${errStr}</b> bei 100 m`;
+      `<div class="ref-status-row"><div class="ref-status-main">` +
+      `<span class="ref-label"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><polyline points="20 6 9 17 4 12"/></svg> ${sourceLabel}</span>` +
+      `<span class="ref-metrics"><b>${cmPerPx.toFixed(2)} cm/px</b></span>` +
+      `</div></div>`;
+    statusRef.innerHTML = `Maßstab: <b style="color:#1d1d1f">${cmPerPx.toFixed(2)} cm/px</b>`;
+    statusRef.style.color = '';
   } else {
     refStatus.innerHTML =
       `<span class="scale-unset-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Maßstab nicht gesetzt</span>` +

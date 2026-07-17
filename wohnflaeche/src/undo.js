@@ -8,12 +8,10 @@ export function registerRestoreHook(fn) { _restoreHooks.push(fn); }
 
 export function getSnapshot() {
   const json = canvas.toJSON(CANVAS_SERIAL_PROPS);
-  json.objects = (json.objects || []).filter(o => !o._isBackground && o._dimLinePipeId == null);
+  json.objects = (json.objects || []).filter(o => !o._isBackground);
   return {
     canvas:        JSON.stringify(json),
     measurements:  JSON.stringify(state.measurements),
-    pipeRefs:      JSON.stringify(state.pipeReferences),
-    activePipeRefs:JSON.stringify(state.activePipeRefs),
     scale:         state.scale,
     scaleSource:   state.scaleSource,
     refLines:      JSON.stringify(state.refLines),
@@ -40,22 +38,11 @@ export function restoreSnapshot(snap) {
         if (bg) { canvas.add(bg); canvas.sendToBack(bg); }
         state.backgroundImage  = bg;
         state.measurements     = JSON.parse(snap.measurements);
-        state.pipeReferences   = JSON.parse(snap.pipeRefs);
-        state.activePipeRefs   = JSON.parse(snap.activePipeRefs);
         state.scale            = snap.scale;
         state.scaleSource      = snap.scaleSource;
         state.refLines         = JSON.parse(snap.refLines);
         state.refSumL2         = snap.refSumL2;
         setMeasureId(snap.measureId);
-
-        // Integrity checks
-        const validRefIds = new Set(state.pipeReferences.map(r => r.id));
-        state.activePipeRefs = state.activePipeRefs.filter(id => validRefIds.has(id));
-        state.measurements.forEach(m => {
-          if (Array.isArray(m.refs)) {
-            m.refs = m.refs.filter(id => validRefIds.has(id));
-          }
-        });
 
         // Call registered restore hooks instead of direct function calls
         _restoreHooks.forEach(fn => {
@@ -64,7 +51,6 @@ export function restoreSnapshot(snap) {
         });
 
         canvas.renderAll();
-        canvas.getObjects().filter(o => o._dimLinePipeId != null).forEach(o => canvas.remove(o));
       } catch (e) {
         console.error('Fehler beim Wiederherstellen des Snapshots:', e);
       } finally {
