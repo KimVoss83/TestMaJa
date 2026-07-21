@@ -8,6 +8,7 @@ import { showToast } from '../ui/modals.js';
 export const TOOL_NAMES = {
   select: 'Auswahl', ref: 'Maßstab', distance: 'Distanz',
   area: 'Fläche', circle: 'Kreis', arc: 'Kreisabschnitt', label: 'Label',
+  room: 'Raum', zone: 'Zone', deduction: 'Abzug',
 };
 export const TOOL_HINTS = {
   select: '',
@@ -17,8 +18,11 @@ export const TOOL_HINTS = {
   circle: 'Mittelpunkt klicken …',
   arc: 'Mittelpunkt klicken …',
   label: 'Klicken = neues Label · Doppelklick = bearbeiten',
+  room: 'Eckpunkte klicken → Doppelklick schließt · Shift = 90°-Snap aus',
+  zone: 'In einen Raum klicken, Zone umranden → Doppelklick',
+  deduction: 'Pfeiler/Kamin im Raum umranden → Doppelklick',
 };
-export const MEASURE_TOOLS = ['distance', 'area', 'circle', 'arc'];
+export const MEASURE_TOOLS = ['distance', 'area', 'circle', 'arc', 'room', 'zone', 'deduction'];
 
 // ── Hook registry for cross-module calls ──────────────────
 const _hooks = {};
@@ -60,7 +64,12 @@ export function updateMeasureButtons() {
     btn.classList.toggle('needs-ref', !state.scale);
     btn.title = !state.scale
       ? 'Zuerst Referenzmaß setzen!'
-      : { distance: 'Distanz messen (2 Klicks)', area: 'Polygon-Fläche (Doppelklick zum Abschluss)', circle: 'Kreis: Klick = Mittelpunkt, 2. Klick = Radius', arc: 'Kreisabschnitt: 3 Klicks' }[id];
+      : {
+          distance: 'Distanz messen (2 Klicks)', area: 'Polygon-Fläche (Doppelklick zum Abschluss)',
+          circle: 'Kreis: Klick = Mittelpunkt, 2. Klick = Radius', arc: 'Kreisabschnitt: 3 Klicks',
+          room: 'Raum erfassen (WoFlV)', zone: 'Höhenzone (Dachschräge)',
+          deduction: 'Abzugsfläche (Pfeiler, Kamin)',
+        }[id];
   });
 }
 

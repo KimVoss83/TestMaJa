@@ -13,6 +13,7 @@ import { handleCircleClick, updatePreviewCircle, finishCircle } from './tools/ci
 import { handleArcClick, updatePreviewArc, finishArc } from './tools/arc.js';
 import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
 import { handleRefClick, updateRefStatus } from './tools/ref.js';
+import { handleRoomClick, handleRoomDblClick, cancelRoomDraft, rebuildRooms } from './tools/room.js';
 import { updateMeasurementList, removeMeasurement, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
 import './io/library.js'; // side-effect: inits custom lib, renders library, sets window.* for onclick
 import './io/image-loader.js'; // side-effect: sets up file-input and drag-drop handlers
@@ -115,6 +116,7 @@ canvas.on('mouse:down', _safeHandler(opt => {
     case 'circle':   handleCircleClick(p); break;
     case 'arc':      handleArcClick(p); break;
     case 'label':    handleLabelClick(p); break;
+    case 'room':     handleRoomClick(p, opt.e); break;
   }
 }));
 
@@ -143,6 +145,7 @@ canvas.on('mouse:dblclick', _safeHandler(opt => {
 
   // Werkzeug-spezifische Aktionen
   if (state.tool === 'area' && state.areaPoints.length >= 3) { finishArea(); return; }
+  if (state.tool === 'room') { handleRoomDblClick(); return; }
   // End area edit when double-clicking on empty area
   if (state.tool === 'select' && state.editingArea && (!opt.target || (!opt.target._areaHandle && opt.target._measureId !== state.editingArea.id))) {
     endAreaEdit(); saveSnapshot();
@@ -264,6 +267,7 @@ function cancelDrawing() {
   if (state.drawingLine) { canvas.remove(state.drawingLine); state.drawingLine = null; }
   if (state.drawingPolygon) { canvas.remove(state.drawingPolygon); state.drawingPolygon = null; }
   canvas.getObjects().filter(o => o._circlePreview || o._arcPreview || o._tempDraw).forEach(o => canvas.remove(o));
+  cancelRoomDraft();
   state.distPoints = [];
   state.areaPoints = [];
   state.circleCenter = null;

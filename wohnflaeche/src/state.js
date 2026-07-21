@@ -53,6 +53,12 @@ export const state = {
   zoom: 1,
   panning: false,
   lastPan: null,
+
+  rooms: [],          // Wohnflächen-Räume (siehe Spec-Datenmodell)
+  roomDraft: [],      // Punkte des aktuell gezeichneten Raum-Polygons
+  roomSnap: true,     // 90°-Snap default AN (Shift = frei)
+  printScale: null,   // 1:X aus PDF-Kalibrierung (nur Anzeige)
+  pdfPage: null,       // { widthPt, heightPt, renderedWidthPx } nach PDF-Import
 };
 
 export let measureId = 0;
