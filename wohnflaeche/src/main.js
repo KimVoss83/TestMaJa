@@ -17,6 +17,7 @@ import { handleRoomClick, handleRoomDblClick, cancelRoomDraft, rebuildRooms } fr
 import { handleZoneClick, handleZoneDblClick, cancelZoneDraft } from './tools/zone.js';
 import { updateMeasurementList, removeMeasurement, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
 import { updateRoomList } from './ui/raumliste.js';
+import { exportReportPDF, exportCSV } from './io/report.js';
 import './io/library.js'; // side-effect: inits custom lib, renders library, sets window.* for onclick
 import './io/image-loader.js'; // side-effect: sets up file-input and drag-drop handlers
 import './io/save-load.js'; // side-effect: sets window.openSaveModal, window.openLoadModal
@@ -305,6 +306,8 @@ initToolbar();
 
 document.getElementById('btn-undo').onclick = () => undo();
 document.getElementById('btn-redo').onclick = () => redo();
+document.getElementById('btn-report-pdf').onclick = exportReportPDF;
+document.getElementById('btn-report-csv').onclick = exportCSV;
 
 // 90° snap toggle for area tool
 document.getElementById('btn-snap90').onclick = () => {
