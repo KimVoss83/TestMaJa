@@ -4,6 +4,7 @@ import { showToast } from '../ui/modals.js';
 import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
 import { isPdfFile, loadPdfFile } from './pdf-import.js';
+import { showScaleOnboarding } from '../onboarding/scale-onboarding.js';
 
 // =========================================================
 // IMAGE UPLOAD
@@ -76,11 +77,13 @@ export function loadImageFromDataUrl(dataUrl) {
       state.measurements = [];
       updateMeasurementList();
       updateRefStatus();
+      showScaleOnboarding();
   });
 }
 
 export async function loadImage(file) {
   const dataUrl = await normalizeOrientation(file);
+  state.pdfPage = null; // reines Bild: keine (evtl. veralteten) PDF-Metadaten aus vorherigem Import
   loadImageFromDataUrl(dataUrl);
 }
 
