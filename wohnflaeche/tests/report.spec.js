@@ -27,6 +27,23 @@ test('CSV enthält Kopf, Raumzeile und Summen mit Dezimal-Komma', async ({ page 
   expect(csv).toContain('Wohnfläche gesamt');
 });
 
+test('CSV-Download über echten Klick enthält UTF-8-BOM und Rauminhalt', async ({ page }) => {
+  await setupApp(page); await seedRooms(page);
+  const dl = page.waitForEvent('download', { timeout: 30000 });
+  await page.evaluate(() => document.getElementById('btn-report-csv').click());
+  const download = await dl;
+  expect(download.suggestedFilename()).toBe('wohnflaeche.csv');
+  const chunks = [];
+  for await (const c of await download.createReadStream()) chunks.push(c);
+  const buf = Buffer.concat(chunks);
+  expect(buf[0]).toBe(0xEF);
+  expect(buf[1]).toBe(0xBB);
+  expect(buf[2]).toBe(0xBF);
+  const content = buf.subarray(3).toString('utf-8');
+  expect(content).toContain('Wohnzimmer');
+  expect(content).toContain(';');
+});
+
 test('PDF-Bericht ist eine valide PDF-Datei', async ({ page }) => {
   await setupApp(page); await seedRooms(page);
   const dl = page.waitForEvent('download', { timeout: 30000 });
