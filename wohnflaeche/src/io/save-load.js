@@ -4,6 +4,7 @@ import { showToast, createModal } from '../ui/modals.js';
 import { history, saveSnapshot, updateUndoRedoButtons } from '../undo.js';
 import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
+import { rebuildRooms, syncRoomIdCounter } from '../tools/room.js';
 
 // SAVE / LOAD  (Zentrales Modal)
 // =========================================================
@@ -249,26 +250,37 @@ export function doSavePDF() {
 }
 document.getElementById('btn-save-pdf').onclick = doSavePDF;
 
+// Baut das Projekt-JSON als reine Datenfunktion (kein DOM-Seiteneffekt) —
+// von doSaveProjectJSON() für den Datei-Download sowie direkt aus Tests genutzt.
+// version 3 (bestehend: refLines/grid/measurements) → version 4 (Task 10: + rooms/printScale/pdfPage).
+export function buildProjectJSON() {
+  const data = {
+    version: 4,
+    scale: state.scale,
+    scaleSource: state.scaleSource,
+    imgDisplayScale: state.imgDisplayScale,
+    exifAltitude: state.exifAltitude,
+    refLines: state.refLines,
+    refSumL2: state.refSumL2,
+    imgOriginalWidth: state.imgOriginalWidth,
+    fontSize: state.fontSize,
+    labelBg: state.labelBg,
+    gridStepM: state.gridStepM || 0,
+    gridColor: state.gridColor || '#ffffff',
+    gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
+    measurements: state.measurements.map(({ id, type, label, value, rMeters }) => ({ id, type, label, value, rMeters })),
+    rooms: state.rooms,
+    printScale: state.printScale,
+    pdfPage: state.pdfPage,
+    canvas: canvas.toJSON(CANVAS_SERIAL_PROPS),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
 export function doSaveProjectJSON() {
   try {
-    const data = {
-      version: 3,
-      scale: state.scale,
-      scaleSource: state.scaleSource,
-      imgDisplayScale: state.imgDisplayScale,
-      exifAltitude: state.exifAltitude,
-      refLines: state.refLines,
-      refSumL2: state.refSumL2,
-      imgOriginalWidth: state.imgOriginalWidth,
-      fontSize: state.fontSize,
-      labelBg: state.labelBg,
-      gridStepM: state.gridStepM || 0,
-      gridColor: state.gridColor || '#ffffff',
-      gridOpacity: state.gridOpacity != null ? state.gridOpacity : 0.28,
-      measurements: state.measurements.map(({ id, type, label, value, rMeters }) => ({ id, type, label, value, rMeters })),
-      canvas: canvas.toJSON(CANVAS_SERIAL_PROPS),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const json = buildProjectJSON();
+    const blob = new Blob([json], { type: 'application/json' });
     const file = new File([blob], 'gartenplan.json', { type: 'application/json' });
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: 'Gartenplan' }).catch(() => {});
@@ -289,48 +301,68 @@ export function doSaveProjectJSON() {
 }
 document.getElementById('btn-save-json').onclick = doSaveProjectJSON;
 
+// Stellt state (inkl. Räume, Task 10) aus einem Projekt-JSON-String wieder her
+// und lädt den Fabric-Canvas nach. Reine Restore-Funktion (kein FileReader/
+// Datei-Handling) — wird vom json-input-onchange-Handler unten sowie direkt
+// aus Tests genutzt. Wirft bei ungültigem Format/Canvas-Fehler.
+export function loadProjectJSON(jsonString) {
+  const data = JSON.parse(jsonString);
+  if (typeof data !== 'object' || !data.canvas) throw new Error('Ungültiges Format');
+  state.scale           = (typeof data.scale === 'number' && data.scale > 0) ? data.scale : null;
+  state.scaleSource     = data.scaleSource || null;
+  state.imgDisplayScale = (typeof data.imgDisplayScale === 'number' && data.imgDisplayScale > 0) ? data.imgDisplayScale : 1;
+  state.exifAltitude    = (typeof data.exifAltitude === 'number' && data.exifAltitude > 0) ? data.exifAltitude : null;
+  state.refLines        = Array.isArray(data.refLines) ? data.refLines : [];
+  state.refSumL2        = (typeof data.refSumL2 === 'number') ? data.refSumL2 : 0;
+  state.imgOriginalWidth = data.imgOriginalWidth || null;
+  state.fontSize = (Number.isInteger(data.fontSize) && data.fontSize >= 6 && data.fontSize <= 72) ? data.fontSize : 13;
+  state.labelBg  = data.labelBg === true;
+  state.gridStepM  = (typeof data.gridStepM === 'number') ? data.gridStepM : 0;
+  state.gridColor  = (typeof data.gridColor === 'string' && /^#[0-9a-f]{6}$/i.test(data.gridColor)) ? data.gridColor : '#ffffff';
+  state.gridOpacity = (typeof data.gridOpacity === 'number') ? data.gridOpacity : 0.28;
+  // Task 10: Räume + PDF-Kalibrierungskontext
+  state.rooms      = Array.isArray(data.rooms) ? data.rooms : [];
+  state.printScale = data.printScale ?? null;
+  state.pdfPage    = data.pdfPage ?? null;
+  // Update grid UI controls
+  const _gss = document.getElementById('grid-step-select'); if (_gss) _gss.value = String(state.gridStepM);
+  const _gci = document.getElementById('grid-color-input'); if (_gci) _gci.value = state.gridColor;
+  const _gor = document.getElementById('grid-opacity-range'); if (_gor) _gor.value = Math.round(state.gridOpacity * 100);
+  const _gol = document.getElementById('grid-opacity-label'); if (_gol) _gol.textContent = Math.round(state.gridOpacity * 100) + '%';
+  state.measurements = (data.measurements || []).map(m => ({ ...m }));
+  const _fsi = document.getElementById('font-size-input'); if (_fsi) _fsi.value = state.fontSize;
+  if (window._syncLabelBgBtn) window._syncLabelBgBtn(); // syncs btn-label-bg (set by initToolbar)
+  return new Promise((resolve, reject) => {
+    canvas.loadFromJSON(data.canvas, () => {
+      try {
+        canvas.renderAll();
+        updateRefStatus();
+        updateMeasurementList();
+        syncRoomIdCounter();
+        rebuildRooms();
+        window.updateRoomList?.();
+        const _drop = document.getElementById('drop-overlay'); if (_drop) _drop.classList.add('hidden');
+        history.past = []; history.future = []; updateUndoRedoButtons();
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 document.getElementById('btn-load-json').onclick = () => document.getElementById('json-input').click();
 document.getElementById('json-input').onchange = e => {
   const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => {
     try {
-      const data = JSON.parse(ev.target.result);
-      if (typeof data !== 'object' || !data.canvas) throw new Error('Ungültiges Format');
-      state.scale           = (typeof data.scale === 'number' && data.scale > 0) ? data.scale : null;
-      state.scaleSource     = data.scaleSource || null;
-      state.imgDisplayScale = (typeof data.imgDisplayScale === 'number' && data.imgDisplayScale > 0) ? data.imgDisplayScale : 1;
-      state.exifAltitude    = (typeof data.exifAltitude === 'number' && data.exifAltitude > 0) ? data.exifAltitude : null;
-      state.refLines        = Array.isArray(data.refLines) ? data.refLines : [];
-      state.refSumL2        = (typeof data.refSumL2 === 'number') ? data.refSumL2 : 0;
-      state.imgOriginalWidth = data.imgOriginalWidth || null;
-      state.fontSize = (Number.isInteger(data.fontSize) && data.fontSize >= 6 && data.fontSize <= 72) ? data.fontSize : 13;
-      state.labelBg  = data.labelBg === true;
-      state.gridStepM  = (typeof data.gridStepM === 'number') ? data.gridStepM : 0;
-      state.gridColor  = (typeof data.gridColor === 'string' && /^#[0-9a-f]{6}$/i.test(data.gridColor)) ? data.gridColor : '#ffffff';
-      state.gridOpacity = (typeof data.gridOpacity === 'number') ? data.gridOpacity : 0.28;
-      // Update grid UI controls
-      const _gss = document.getElementById('grid-step-select'); if (_gss) _gss.value = String(state.gridStepM);
-      const _gci = document.getElementById('grid-color-input'); if (_gci) _gci.value = state.gridColor;
-      const _gor = document.getElementById('grid-opacity-range'); if (_gor) _gor.value = Math.round(state.gridOpacity * 100);
-      const _gol = document.getElementById('grid-opacity-label'); if (_gol) _gol.textContent = Math.round(state.gridOpacity * 100) + '%';
-      state.measurements = (data.measurements || []).map(m => ({ ...m }));
-      document.getElementById('font-size-input').value = state.fontSize;
-      if (window._syncLabelBgBtn) window._syncLabelBgBtn(); // syncs btn-label-bg (set by initToolbar)
-      canvas.loadFromJSON(data.canvas, () => {
-        try {
-          canvas.renderAll();
-          updateRefStatus();
-          updateMeasurementList();
-          document.getElementById('drop-overlay').classList.add('hidden');
-          history.past = []; history.future = []; updateUndoRedoButtons();
-          showToast('Projekt geladen', 'success');
-        } catch (err) {
-          console.error('Laden fehlgeschlagen (Canvas-Callback):', err);
-          showToast('Fehler beim Laden der Datei.', 'error');
-        }
-      });
-    } catch { showToast('Fehler beim Laden der Datei.', 'error'); }
+      await loadProjectJSON(ev.target.result);
+      showToast('Projekt geladen', 'success');
+    } catch (err) {
+      console.error('Laden fehlgeschlagen:', err);
+      showToast('Fehler beim Laden der Datei.', 'error');
+    }
   };
   reader.readAsText(file);
   e.target.value = '';
