@@ -15,6 +15,7 @@ import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from '.
 import { handleRefClick, updateRefStatus } from './tools/ref.js';
 import { handleRoomClick, handleRoomDblClick, cancelRoomDraft, rebuildRooms } from './tools/room.js';
 import { updateMeasurementList, removeMeasurement, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
+import { updateRoomList } from './ui/raumliste.js';
 import './io/library.js'; // side-effect: inits custom lib, renders library, sets window.* for onclick
 import './io/image-loader.js'; // side-effect: sets up file-input and drag-drop handlers
 import './io/save-load.js'; // side-effect: sets window.openSaveModal, window.openLoadModal
@@ -375,6 +376,7 @@ canvas.on('after:render', () => {
 
 updateRefStatus();
 updateMeasurementList();
+updateRoomList();
 
 document.getElementById('fs-measure').addEventListener('input', e => resizeLabelCluster('measure', e.target.value));
 document.getElementById('fs-label').addEventListener('input',   e => resizeLabelCluster('label',   e.target.value));
