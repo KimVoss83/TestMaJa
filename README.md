@@ -12,8 +12,10 @@ Quelle der Haupt-App:
 |------|-------|
 | `index-1.html` | **Ausgelieferte Haupt-App** (Single-File-Build). In diese Datei injiziert die CI die Release-Notes. |
 | `feldaufnahme.html` | Eigenständige Feldaufnahme-App (Element-/Referenz-Workflow). |
+| `wohnflaeche.html` | Wohnflächen-App: Messen in Wohnungsgrundrissen, WoFlV-Berechnung (Single-File-Build). |
 | `planer/` | Quellcode der Haupt-App (Vite + ES-Module). |
 | `planer/dist/` | Vite-Build-Ausgabe der Haupt-App. |
+| `wohnflaeche/` | Quellcode der Wohnflächen-App (Vite + ES-Module). |
 
 > Hinweis: `index-1.html` und `planer/dist/index.html` sind beide Build-Ergebnisse
 > desselben Quellcodes unter `planer/src/`. Änderungen immer in `planer/src/`
@@ -40,6 +42,12 @@ Zusätzlich für das CI-Skript:
 
 ```bash
 python3 .github/scripts/test_inject_release_notes.py
+```
+
+Wohnflächen-App:
+```bash
+cd wohnflaeche
+npm test
 ```
 
 ## Sicherheit
