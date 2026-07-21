@@ -1,8 +1,9 @@
 import { state } from '../state.js';
 import { canvas, wrapper } from '../canvas.js';
-import { showToast, createModal } from '../ui/modals.js';
+import { showToast } from '../ui/modals.js';
 import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
+import { isPdfFile, loadPdfFile } from './pdf-import.js';
 
 // =========================================================
 // IMAGE UPLOAD
@@ -83,54 +84,15 @@ export async function loadImage(file) {
   loadImageFromDataUrl(dataUrl);
 }
 
-export async function loadPdf(file) {
-  if (!window.pdfjsLib) { showToast('PDF.js nicht verfügbar.', 'error'); return; }
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const numPages = pdf.numPages;
-
-    const renderPage = async pageNum => {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 3 });
-      const c = document.createElement('canvas');
-      c.width = viewport.width;
-      c.height = viewport.height;
-      await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
-      return c.toDataURL('image/png');
-    };
-
-    if (numPages === 1) {
-      const dataUrl = await renderPage(1);
-      loadImageFromDataUrl(dataUrl);
-    } else {
-      const bodyHTML = `
-        <p style="font-size:13px;color:#636366;margin-bottom:12px;">
-          Die PDF hat <b>${numPages} Seiten</b>. Welche Seite soll geladen werden?
-        </p>
-        <input id="_pdf-page-input" type="number" min="1" max="${numPages}" value="1"
-          style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;" />
-        <div style="font-size:11px;color:#8e8e93;margin-top:4px;">Seite 1 – ${numPages}</div>
-      `;
-      createModal('PDF-Seite auswählen', bodyHTML, async () => {
-        const n = Math.min(numPages, Math.max(1, parseInt(document.getElementById('_pdf-page-input').value) || 1));
-        const dataUrl = await renderPage(n);
-        loadImageFromDataUrl(dataUrl);
-      });
-    }
-  } catch (err) {
-    showToast('PDF konnte nicht geladen werden.', 'error');
-    console.error(err);
-  }
-}
-
 export function loadFileAuto(file) {
   if (!file) return;
-  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    loadPdf(file);
-  } else {
-    loadImage(file);
+  if (isPdfFile(file)) {
+    loadPdfFile(file).then(({ dataUrl }) => {
+      loadImageFromDataUrl(dataUrl);
+    }).catch(() => {});
+    return;
   }
+  loadImage(file);
 }
 
 // btn-upload ist jetzt ein <label for="file-input"> — kein JS nötig
@@ -142,7 +104,7 @@ wrapper.addEventListener('drop', e => {
   e.preventDefault();
   wrapper.style.outline = '';
   const file = e.dataTransfer.files[0];
-  if (file && (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))) loadFileAuto(file);
+  if (file && (file.type.startsWith('image/') || isPdfFile(file))) loadFileAuto(file);
 });
 
 // _loupe and throttledRender are imported from ./utils/loupe.js
