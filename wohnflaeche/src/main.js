@@ -14,6 +14,7 @@ import { handleArcClick, updatePreviewArc, finishArc } from './tools/arc.js';
 import { handleLabelClick, editLabel, updateLiveLabel, removeLiveLabel } from './tools/label.js';
 import { handleRefClick, updateRefStatus } from './tools/ref.js';
 import { handleRoomClick, handleRoomDblClick, cancelRoomDraft, rebuildRooms } from './tools/room.js';
+import { handleZoneClick, handleZoneDblClick, cancelZoneDraft } from './tools/zone.js';
 import { updateMeasurementList, removeMeasurement, initSidebarResize, resizeLabelCluster } from './ui/sidebar.js';
 import { updateRoomList } from './ui/raumliste.js';
 import './io/library.js'; // side-effect: inits custom lib, renders library, sets window.* for onclick
@@ -118,6 +119,8 @@ canvas.on('mouse:down', _safeHandler(opt => {
     case 'arc':      handleArcClick(p); break;
     case 'label':    handleLabelClick(p); break;
     case 'room':     handleRoomClick(p, opt.e); break;
+    case 'zone':      handleZoneClick(p, 'zone'); break;
+    case 'deduction': handleZoneClick(p, 'deduction'); break;
   }
 }));
 
@@ -147,6 +150,7 @@ canvas.on('mouse:dblclick', _safeHandler(opt => {
   // Werkzeug-spezifische Aktionen
   if (state.tool === 'area' && state.areaPoints.length >= 3) { finishArea(); return; }
   if (state.tool === 'room') { handleRoomDblClick(); return; }
+  if (state.tool === 'zone' || state.tool === 'deduction') { handleZoneDblClick(state.tool === 'zone' ? 'zone' : 'deduction'); return; }
   // End area edit when double-clicking on empty area
   if (state.tool === 'select' && state.editingArea && (!opt.target || (!opt.target._areaHandle && opt.target._measureId !== state.editingArea.id))) {
     endAreaEdit(); saveSnapshot();
@@ -269,6 +273,7 @@ function cancelDrawing() {
   if (state.drawingPolygon) { canvas.remove(state.drawingPolygon); state.drawingPolygon = null; }
   canvas.getObjects().filter(o => o._circlePreview || o._arcPreview || o._tempDraw).forEach(o => canvas.remove(o));
   cancelRoomDraft();
+  cancelZoneDraft();
   state.distPoints = [];
   state.areaPoints = [];
   state.circleCenter = null;
