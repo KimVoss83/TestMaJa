@@ -331,6 +331,9 @@ document.getElementById('btn-clear-all').onclick = () => {
       state.refLines = [];
       state.refSumL2 = 0;
       state.backgroundImage = null;
+      state.rooms = [];
+      state.printScale = null;
+      state.pdfPage = null;
       state.gridVisible = false;
       const gcClear = document.getElementById('grid-canvas');
       if (gcClear) gcClear.getContext('2d').clearRect(0, 0, gcClear.width, gcClear.height);
@@ -342,6 +345,8 @@ document.getElementById('btn-clear-all').onclick = () => {
       document.getElementById('drop-overlay').classList.remove('hidden');
       updateMeasurementList();
       updateRefStatus();
+      rebuildRooms();
+      updateRoomList();
       canvas.renderAll();
     }
   );

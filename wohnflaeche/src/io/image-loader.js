@@ -5,6 +5,7 @@ import { updateRefStatus } from '../tools/ref.js';
 import { updateMeasurementList } from '../ui/sidebar.js';
 import { isPdfFile, loadPdfFile } from './pdf-import.js';
 import { showScaleOnboarding } from '../onboarding/scale-onboarding.js';
+import { rebuildRooms } from '../tools/room.js';
 
 // =========================================================
 // IMAGE UPLOAD
@@ -75,8 +76,12 @@ export function loadImageFromDataUrl(dataUrl) {
       state.refLines = [];
       state.refSumL2 = 0;
       state.measurements = [];
+      state.rooms = [];
+      state.printScale = null;
       updateMeasurementList();
       updateRefStatus();
+      rebuildRooms();
+      window.updateRoomList?.();
       showScaleOnboarding();
   });
 }
