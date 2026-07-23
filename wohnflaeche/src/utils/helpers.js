@@ -24,6 +24,16 @@ export function snapToPixel(p) {
   return { x: img.left + origX * s, y: img.top + origY * s };
 }
 
+// Canvas-px pro Meter: state.scale ist in Original-Bild-px/m kalibriert
+// (siehe ref.js), Raum-/Zonen-/Abzugs-Polygone speichern aber Canvas-
+// Display-px (wie echte Mausklicks sie liefern, siehe room.js/zone.js).
+// woflv/calc.js erwartet laut eigenem Kontrakt Canvas-px-Polygone +
+// Canvas-px-pro-Meter-Maßstab — daher hier kombinieren, statt state.scale
+// allein an roomCalc()/totals() zu übergeben.
+export function canvasScale() {
+  return state.scale * state.imgDisplayScale;
+}
+
 // Project point p onto line defined by ref {x1,y1,x2,y2}
 // Returns { point: {x,y}, dist, t }
 export function projectPointOnLine(p, ref) {

@@ -18,7 +18,7 @@ test('Räume überleben Speichern → Laden (Round-Trip)', async ({ page }) => {
     const { state } = await import('/src/state.js');
     const { rebuildRooms, syncRoomIdCounter } = await import('/src/tools/room.js');
     const sl = await import('/src/io/save-load.js');
-    const s = state.scale;
+    const s = state.scale * state.imgDisplayScale; // Canvas-px pro Meter
     state.rooms = [{ id: 1, name: 'Küche', kind: 'wohnflaeche', category: 'normal',
       balkonFaktor: 0.25,
       polygon: [{x:100,y:100},{x:100+3*s,y:100},{x:100+3*s,y:100+2*s},{x:100,y:100+2*s}],

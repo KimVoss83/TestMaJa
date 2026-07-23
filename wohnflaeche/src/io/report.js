@@ -1,6 +1,7 @@
 import { state } from '../state.js';
 import { canvas } from '../canvas.js';
 import { totals, fmt2 } from '../woflv/calc.js';
+import { canvasScale } from '../utils/helpers.js';
 
 export function buildCSV(rooms, scale) {
   const t = totals(rooms, scale);
@@ -19,7 +20,7 @@ export function buildCSV(rooms, scale) {
 }
 
 export function exportCSV() {
-  const blob = new Blob(['﻿' + buildCSV(state.rooms, state.scale)],  // BOM für Excel-Umlaute
+  const blob = new Blob(['﻿' + buildCSV(state.rooms, canvasScale())],  // BOM für Excel-Umlaute
     { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -40,7 +41,7 @@ export function exportReportPDF() {
   doc.addImage(png, 'PNG', 10, 18, iw * f, ih * f);
   // ── Seite 2: Tabelle ──
   doc.addPage('a4', 'portrait');
-  const t = totals(state.rooms, state.scale);
+  const t = totals(state.rooms, canvasScale());
   doc.setFontSize(14); doc.text('Wohnflächenberechnung — Raumliste', 14, 16);
   doc.setFontSize(9);
   const cols = [14, 64, 94, 118, 140, 158, 176];

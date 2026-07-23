@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 import { canvas } from '../canvas.js';
 import { saveSnapshot } from '../undo.js';
-import { addEndpointDot, snapToPixel } from '../utils/helpers.js';
+import { addEndpointDot, snapToPixel, canvasScale } from '../utils/helpers.js';
 import { createModal, showToast } from '../ui/modals.js';
 import { roomCalc, fmt2 } from '../woflv/calc.js';
 import { escHtml } from '../utils/helpers.js';
@@ -110,7 +110,7 @@ export function rebuildRooms() {
       objectCaching: false,
     }));
     const c = centroid(room.polygon);
-    const m2 = state.scale ? fmt2(roomCalc(room, state.scale).anrechenbar) + ' m²' : '– m²';
+    const m2 = state.scale ? fmt2(roomCalc(room, canvasScale()).anrechenbar) + ' m²' : '– m²';
     canvas.add(new fabric.Text(`${room.name}\n${m2}`, {
       left: c.x, top: c.y, originX: 'center', originY: 'center',
       fontSize: 13, fontFamily: 'Inter, sans-serif', fill: '#1d1d1f',

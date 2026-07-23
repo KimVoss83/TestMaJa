@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 import { canvas } from '../canvas.js';
 import { saveSnapshot } from '../undo.js';
-import { addEndpointDot, snapToPixel } from '../utils/helpers.js';
+import { addEndpointDot, snapToPixel, canvasScale } from '../utils/helpers.js';
 import { createModal, showToast } from '../ui/modals.js';
 import { pointInPolygon, intersectionArea, MIN_ABZUG_M2 } from '../woflv/calc.js';
 import { rebuildRooms } from './room.js';
@@ -60,7 +60,8 @@ export function handleZoneDblClick(mode) {
         const label = document.getElementById('ded-label').value.trim() || 'Abzug';
         room.deductions.push({ id: _zoneId++, polygon, label });
         // §3(3)-Hinweis: zu kleine Abzüge zählen nicht
-        const a = intersectionArea(polygon, room.polygon) / (state.scale * state.scale);
+        const cs = canvasScale();
+        const a = intersectionArea(polygon, room.polygon) / (cs * cs);
         if (a <= MIN_ABZUG_M2)
           showToast(`Abzug „${label}“ ist ≤ 0,1 m² und zählt nach WoFlV §3(3) nicht.`, 'warning');
         rebuildRooms(); saveSnapshot(); window.updateRoomList?.();

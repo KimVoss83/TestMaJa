@@ -19,7 +19,7 @@ test('Raum zeichnen → state.rooms + korrektes Label', async ({ page }) => {
     const room = state.rooms[0];
     return { n: state.rooms.length, name: room?.name, pts: room?.polygon.length,
              ortho: room ? room.polygon[0].y === room.polygon[1].y : false,
-             m2: room ? roomCalc(room, state.scale).anrechenbar : 0 };
+             m2: room ? roomCalc(room, state.scale * state.imgDisplayScale).anrechenbar : 0 };
   });
   expect(r.n).toBe(1);
   expect(r.name).toBe('Wohnzimmer');

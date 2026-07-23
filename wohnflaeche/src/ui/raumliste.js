@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { saveSnapshot } from '../undo.js';
-import { escHtml } from '../utils/helpers.js';
+import { escHtml, canvasScale } from '../utils/helpers.js';
 import { createModal } from './modals.js';
 import { totals, fmt2, BALKON_KATEGORIEN } from '../woflv/calc.js';
 import { rebuildRooms, ROOM_COLORS } from '../tools/room.js';
@@ -12,7 +12,7 @@ export function updateRoomList() {
   const sums = document.getElementById('room-sums');
   const badge = document.getElementById('badge-raeume');
   if (!list) return;
-  const t = totals(state.rooms, state.scale || 1);
+  const t = totals(state.rooms, state.scale ? canvasScale() : 1);
   badge.textContent = String(state.rooms.length);
 
   list.innerHTML = t.perRoom.map(({ room, calc }) => {

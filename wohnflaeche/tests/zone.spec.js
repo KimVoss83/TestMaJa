@@ -7,7 +7,7 @@ test('50%-Zone im Raum reduziert die Summe; Mini-Abzug wird ignoriert', async ({
   await page.evaluate(async () => {
     const { state } = await import('/src/state.js');
     const { rebuildRooms, syncRoomIdCounter } = await import('/src/tools/room.js');
-    const s = state.scale;
+    const s = state.scale * state.imgDisplayScale; // Canvas-px pro Meter
     state.rooms = [{ id: 1, name: 'DG-Zimmer', kind: 'wohnflaeche', category: 'normal',
       balkonFaktor: 0.25,
       polygon: [{x:100,y:100},{x:100+4*s,y:100},{x:100+4*s,y:100+3*s},{x:100,y:100+3*s}],
@@ -18,7 +18,10 @@ test('50%-Zone im Raum reduziert die Summe; Mini-Abzug wird ignoriert', async ({
     document.getElementById('room-sums').textContent);
   expect(before).toContain('12,00');
   // Zone (halber Raum, 4×1,5 m) per Werkzeug einzeichnen
-  const s = await page.evaluate(async () => (await import('/src/state.js')).state.scale);
+  const s = await page.evaluate(async () => {
+    const { state } = await import('/src/state.js');
+    return state.scale * state.imgDisplayScale;
+  });
   const box = await page.locator('#c').boundingBox();
   await page.click('#btn-zone');
   const px = v => box.x + 100 + v, py = v => box.y + 100 + v;
@@ -32,7 +35,7 @@ test('50%-Zone im Raum reduziert die Summe; Mini-Abzug wird ignoriert', async ({
   const after = await page.evaluate(async () => {
     const { state } = await import('/src/state.js');
     const { roomCalc } = await import('/src/woflv/calc.js');
-    return roomCalc(state.rooms[0], state.scale).anrechenbar;
+    return roomCalc(state.rooms[0], state.scale * state.imgDisplayScale).anrechenbar;
   });
   expect(after).toBeGreaterThan(8.5);   // ~9 m² (6 + 0,5·6), Zeichen-Toleranz
   expect(after).toBeLessThan(9.5);

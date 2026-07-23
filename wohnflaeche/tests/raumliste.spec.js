@@ -5,7 +5,10 @@ async function addRoomsProgrammatically(page) {
   await page.evaluate(async () => {
     const { state } = await import('/src/state.js');
     const { rebuildRooms, syncRoomIdCounter } = await import('/src/tools/room.js');
-    const s = state.scale; // px/m
+    // Canvas-px pro Meter: state.scale ist in Original-Bild-px/m kalibriert
+    // (siehe ref.js), Polygone werden aber in Canvas-Display-px gespeichert
+    // (wie echte Mausklicks sie liefern) — daher zusätzlich × imgDisplayScale.
+    const s = state.scale * state.imgDisplayScale;
     const rect = (x, y, wM, hM) => [
       { x, y }, { x: x + wM * s, y }, { x: x + wM * s, y: y + hM * s }, { x, y: y + hM * s }];
     state.rooms = [

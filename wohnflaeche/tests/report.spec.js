@@ -5,7 +5,7 @@ async function seedRooms(page) {
   await page.evaluate(async () => {
     const { state } = await import('/src/state.js');
     const { rebuildRooms, syncRoomIdCounter } = await import('/src/tools/room.js');
-    const s = state.scale;
+    const s = state.scale * state.imgDisplayScale; // Canvas-px pro Meter
     state.rooms = [
       { id: 1, name: 'Wohnzimmer', kind: 'wohnflaeche', category: 'normal', balkonFaktor: 0.25,
         polygon: [{x:100,y:100},{x:100+4*s,y:100},{x:100+4*s,y:100+3*s},{x:100,y:100+3*s}],
@@ -19,7 +19,7 @@ test('CSV enthält Kopf, Raumzeile und Summen mit Dezimal-Komma', async ({ page 
   const csv = await page.evaluate(async () => {
     const { buildCSV } = await import('/src/io/report.js');
     const { state } = await import('/src/state.js');
-    return buildCSV(state.rooms, state.scale);
+    return buildCSV(state.rooms, state.scale * state.imgDisplayScale);
   });
   expect(csv).toContain('"Raum";"Art"');
   expect(csv).toContain('Wohnzimmer');
